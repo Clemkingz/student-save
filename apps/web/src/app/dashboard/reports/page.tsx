@@ -198,7 +198,7 @@ function ReportsContent() {
         <section className={`${styles.panel} ${styles.reportChartPanel}`}>
           <h2>Funds and expenses over time</h2>
           <p className={styles.budgetRemaining}>{bounds.start.slice(0, 7) === bounds.end.slice(0, 7) ? "Weekly totals for the selected month." : "Monthly totals for the selected date range."} Use the filters above to compare a different period.</p>
-          <MoneyFlowChart points={moneyFlow} ariaLabel="Monthly funds added and expenses for the selected report period" smooth />
+          <MoneyFlowChart points={moneyFlow} ariaLabel="Monthly funds added and expenses for the selected report period" />
           {moneyFlow.length > 0 && <ul className={styles.reportFlowDetails}>{moneyFlow.map((item) => <li key={`detail-${item.label}`}><span>{item.label}</span><span>Funds {money(item.income)}</span><span>Expenses {money(item.expense)}</span><strong>Net {money(item.income - item.expense)}</strong></li>)}</ul>}
         </section>
         <section className={styles.panel}>

@@ -1,67 +1,65 @@
 "use client";
 
-import styles from "../dashboard.module.css";
-import { useEffect, useRef, useState } from "react";
+import { useState, type CSSProperties } from "react";
+import styles from "./moneyFlowChart.module.css";
 
 export type MoneyFlowPoint = { label: string; income: number; expense: number };
 
-export function MoneyFlowChart({ points, ariaLabel, smooth = false, showValues = true }: { points: MoneyFlowPoint[]; ariaLabel: string; smooth?: boolean; showValues?: boolean }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(720);
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.max(280, Math.round(entry.contentRect.width)));
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, []);
-  const height = width < 520 ? 190 : 230;
-  const left = width < 420 ? 26 : 42;
-  const right = width < 420 ? 10 : 14;
-  const top = width < 420 ? 14 : 18;
-  const bottom = width < 420 ? 34 : 42;
-  const plotWidth = width - left - right;
-  const plotHeight = height - top - bottom;
-  const maxValue = Math.max(1, ...points.flatMap((point) => [point.income, point.expense]));
-  const x = (index: number) => points.length <= 1 ? left + plotWidth / 2 : left + (index / (points.length - 1)) * plotWidth;
-  const y = (value: number) => top + plotHeight - value / maxValue * plotHeight;
-  const makeLine = (value: "income" | "expense") => {
-    const coords = points.map((point, index) => ({ x: x(index), y: y(point[value]) }));
-    if (!coords.length) return "";
-    if (!smooth || coords.length < 3) return coords.map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`).join(" ");
-    return coords.reduce((path, point, index) => {
-      if (index === 0) return `M${point.x},${point.y}`;
-      const previous = coords[index - 1]!;
-      const beforePrevious = coords[Math.max(0, index - 2)]!;
-      const next = coords[Math.min(coords.length - 1, index + 1)]!;
-      const controlOneX = previous.x + (point.x - beforePrevious.x) / 6;
-      const controlOneY = previous.y + (point.y - beforePrevious.y) / 6;
-      const controlTwoX = point.x - (next.x - previous.x) / 6;
-      const controlTwoY = point.y - (next.y - previous.y) / 6;
-      return `${path} C${controlOneX},${controlOneY} ${controlTwoX},${controlTwoY} ${point.x},${point.y}`;
-    }, "");
-  };
-  const incomeLine = makeLine("income");
-  const expenseLine = makeLine("expense");
+const compactMoney = new Intl.NumberFormat("en-NG", { notation: "compact", maximumFractionDigits: 1 });
+const money = (value: number) => `₦${value.toLocaleString("en-NG", { maximumFractionDigits: 2 })}`;
+const safeAmount = (value: number) => Number.isFinite(value) ? Math.max(0, value) : 0;
+
+export function MoneyFlowChart({ points, ariaLabel, showValues = true }: { points: MoneyFlowPoint[]; ariaLabel: string; showValues?: boolean }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const data = points.map((point) => ({ ...point, income: safeAmount(point.income), expense: safeAmount(point.expense) }));
+  const highest = Math.max(1, ...data.flatMap((point) => [point.income, point.expense]));
+  const magnitude = 10 ** Math.floor(Math.log10(highest));
+  const ceiling = Math.ceil(highest / magnitude) * magnitude;
+  const active = activeIndex === null ? undefined : data[activeIndex];
+  const hasActivity = data.some((point) => point.income > 0 || point.expense > 0);
+  const description = (point: MoneyFlowPoint) => showValues
+    ? `${point.label}: funds added ${money(point.income)}, expenses ${money(point.expense)}`
+    : `${point.label}: funds added and expenses. Amounts hidden.`;
 
   return (
-    <div className={styles.moneyFlowChart} ref={containerRef}>
-      <div className={styles.chartLegend}><span><i className={styles.incomeLegend} />Funds added</span><span><i className={styles.expenseLegend} />Expenses</span></div>
-      {points.length ? <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel} preserveAspectRatio="none" style={{ height }}>
-        {[0, 0.5, 1].map((fraction) => {
-          const gridY = top + plotHeight * fraction;
-          return <line key={fraction} x1={left} x2={width - right} y1={gridY} y2={gridY} className={styles.chartGridLine} />;
-        })}
-        <path d={incomeLine} className={styles.incomeLine} />
-        <path d={expenseLine} className={styles.expenseLine} />
-        {points.map((point, index) => <g key={`${point.label}-${index}`}>
-          <circle cx={x(index)} cy={y(point.income)} r="4.5" className={styles.incomePoint}><title>{showValues ? `${point.label}: funds added ₦${point.income.toLocaleString("en-NG")}` : `${point.label}: funds added`}</title></circle>
-          <circle cx={x(index)} cy={y(point.expense)} r="4.5" className={styles.expensePoint}><title>{showValues ? `${point.label}: expenses ₦${point.expense.toLocaleString("en-NG")}` : `${point.label}: expenses`}</title></circle>
-          <text x={x(index)} y={height - 12} textAnchor="middle" className={styles.chartAxisLabel} style={{ fontSize: width < 420 ? 10 : 12 }}>{point.label}</text>
-        </g>)}
-      </svg> : <p className={styles.emptyTransactions}>No fund or expense records in this period yet.</p>}
+    <div className={styles.chart} role="group" aria-label={ariaLabel}>
+      <div className={styles.legend} aria-hidden="true">
+        <span><i className={styles.incomeKey} />Funds added</span>
+        <span><i className={styles.expenseKey} />Expenses</span>
+      </div>
+      {data.length ? <>
+        <div className={styles.plot}>
+          <div className={styles.axis} aria-hidden="true">
+            {[1, .75, .5, .25, 0].map((fraction) => <span key={fraction}>{showValues ? `₦${compactMoney.format(ceiling * fraction)}` : "•••"}</span>)}
+          </div>
+          <div className={styles.scrollArea}>
+            <div className={styles.canvas} style={{ "--columns": data.length, minWidth: data.length * 34 } as CSSProperties}>
+              <div className={styles.grid} aria-hidden="true">{[0, 1, 2, 3, 4].map((line) => <i key={line} />)}</div>
+              <div className={styles.groups}>
+                {data.map((point, index) => <button
+                  type="button"
+                  key={`${point.label}-${index}`}
+                  className={styles.group}
+                  aria-label={description(point)}
+                  aria-pressed={activeIndex === index}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(null)}
+                  onFocus={() => setActiveIndex(index)}
+                  onBlur={() => setActiveIndex(null)}
+                  onClick={() => setActiveIndex(index)}
+                >
+                  <span className={styles.bars} aria-hidden="true">
+                    <span className={`${styles.bar} ${styles.income}`} style={{ height: `${point.income / ceiling * 100}%`, "--index": index } as CSSProperties} />
+                    <span className={`${styles.bar} ${styles.expense}`} style={{ height: `${point.expense / ceiling * 100}%`, "--index": index + .5 } as CSSProperties} />
+                  </span>
+                  <span className={styles.label} aria-hidden="true">{point.label}</span>
+                </button>)}
+              </div>
+            </div>
+          </div>
+        </div>
+        <p className={styles.detail} aria-live="polite">{active ? description(active) : hasActivity ? "Select a period to explore funds added and expenses." : "No fund or expense records in this period yet."}</p>
+      </> : <p className={styles.detail}>No fund or expense records in this period yet.</p>}
     </div>
   );
 }
