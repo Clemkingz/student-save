@@ -134,7 +134,7 @@ function VerifyEmailContent() {
 
       <p className={styles.mockCodeNotice}>Mock email code: <strong>{mockCode || "Loading…"}</strong></p>
       {notice && <p className={styles.formNotice} role="status">{notice}</p>}
-      {verified && <div className={styles.verificationSuccessPopup} role="status" aria-live="polite"><span className={styles.verificationCheck} aria-hidden="true"><svg viewBox="0 0 32 32"><path d="m8 16 5.2 5.2L24 10.5" /></svg></span><strong>Email verified</strong><span>Taking you to wallet setup…</span></div>}
+      {verified && <div className={styles.verificationSuccessOverlay}><div className={styles.verificationSuccessPopup} role="status" aria-live="polite"><span className={styles.verificationCheck} aria-hidden="true"><svg viewBox="0 0 32 32"><path d="m8 16 5.2 5.2L24 10.5" /></svg></span><strong>Email verified</strong><span>Taking you to wallet setup…</span></div></div>}
     </AuthFrame>
   );
 }

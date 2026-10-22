@@ -16,7 +16,6 @@
 .mainContent { min-width: 0; padding: 34px clamp(24px, 3vw, 54px) 48px; }
 .mobileHeader, .mobileNav { display: none; }
 .dashboardTopBar { display: flex; justify-content: flex-end; margin: -13px 0 12px; }
-.sectionTitle { margin-right: auto; align-self: center; color: #344052; font-size: 14px; font-weight: 700; }
 .profileAvatar, .mobileProfileAvatar { display: grid; width: 46px; height: 46px; flex: 0 0 auto; place-items: center; overflow: hidden; border: 2px solid #d3ebe8; border-radius: 50%; color: #fff; background: #137d75; font-size: 17px; font-weight: 750; text-decoration: none; }
 .profileAvatar img, .mobileProfileAvatar img { width: 100%; height: 100%; object-fit: cover; }
 .mobileAccountControls { display: flex; align-items: center; gap: 10px; }
@@ -396,8 +395,7 @@
   .mobileHeader .brand img { width: min(235px, 75vw); }
   .mobileSettingsLink { display: inline-flex; flex: 0 0 auto; color: #116b65; font-size: 14px; font-weight: 700; text-decoration: none; }
   .dashboardTopBar { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
-  .sectionTitle { order: 1; }
-  .dashboardTopBar > a { order: 2; }
+  .dashboardTopBar > a { order: 2; margin-left: auto; }
   .verificationTopMessage { order: 3; width: 100%; margin-right: 0; padding: 15px; }
   .verificationTopMessage strong { font-size: clamp(22px, 7vw, 34px); }
   .mainContent { padding: 27px clamp(20px, 4vw, 34px) 32px; }
@@ -564,7 +562,6 @@
 .activityItem { padding-bottom: 13px; border-bottom: 1px solid #f0f0f3; }
 .activityItem:last-child { padding-bottom: 0; border-bottom: 0; }
 .accountCard:hover, .statGrid > .statCard:hover, .contentGrid > .panel:hover { transform: translateY(-2px); box-shadow: 0 8px 24px #0000000c; }
-.dashboardTopBar .sectionTitle { color: #6e6e73; }
 .statGrid > :nth-child(2), .reportStats > :nth-child(2), .reportStats > :nth-child(3) { animation-delay: .06s; }
 .statGrid > :nth-child(3) { animation-delay: .12s; }
 .mainContent .primaryAction, .mainContent .secondaryAction, .mainContent .createBudgetButton, .mainContent .transactionTab, .mainContent .transactionTabActive {

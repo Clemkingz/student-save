@@ -97,7 +97,7 @@ export function DashboardFrame({ email, active, children }: { email: string; act
       </header>
 
       <main className={styles.mainContent}>
-        <div className={styles.dashboardTopBar}><strong className={styles.sectionTitle}>{active}</strong>{needsStudentVerification && <aside className={styles.verificationTopMessage}><strong>Student verification needed to access dashboard</strong><Link href={`/dashboard/student-verification?email=${encodeURIComponent(email)}`}>Verify student account →</Link></aside>}{active !== "Dashboard" && profilePictureLink(styles.profileAvatar)}</div>
+        <div className={styles.dashboardTopBar}>{needsStudentVerification && <aside className={styles.verificationTopMessage}><strong>Student verification needed to access dashboard</strong><Link href={`/dashboard/student-verification?email=${encodeURIComponent(email)}`}>Verify student account →</Link></aside>}{active !== "Dashboard" && profilePictureLink(styles.profileAvatar)}</div>
         {children}
       </main>
 
