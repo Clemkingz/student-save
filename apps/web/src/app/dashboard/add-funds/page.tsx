@@ -19,7 +19,7 @@ function AddFundsContent() {
   const { email, wallet, ready } = useDashboardSession();
   const [transactions, setTransactions] = useState<MockTransaction[]>([]);
   const [amount, setAmount] = useState("");
-  const [source, setSource] = useState(fundSources[0]);
+  const [source, setSource] = useState(fundSources[0] ?? "Other");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -71,6 +71,7 @@ function AddFundsContent() {
   }
 
   async function copyAccountNumber() {
+    if (!wallet) return;
     try {
       await navigator.clipboard.writeText(wallet.accountNumber);
       setCopied(true);

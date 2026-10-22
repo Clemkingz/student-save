@@ -36,7 +36,7 @@ function TransactionContent() {
   const { email, ready } = useDashboardSession();
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState(expenseCategories[0]);
+  const [category, setCategory] = useState<string>(expenseCategories[0] ?? "Other");
   const [date, setDate] = useState(localDateValue());
   const [note, setNote] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -70,7 +70,7 @@ function TransactionContent() {
 
   function changeType(nextType: TransactionType) {
     setType(nextType);
-    setCategory(nextType === "expense" ? expenseCategories[0] : nextType === "withdrawal" ? "Withdrawal" : incomeCategories[0]);
+    setCategory(nextType === "expense" ? expenseCategories[0] ?? "Other" : nextType === "withdrawal" ? "Withdrawal" : incomeCategories[0] ?? "Other");
     setError("");
     setNotice("");
   }

@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 
 const spendingBars = [42, 58, 46, 72, 52, 66, 86, 61, 75, 54, 96, 69];
-const appSignUpPath = "/app/auth/sign-up";
+const appOrigin = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === "development" ? "http://localhost:3000" : "");
+const appSignUpPath = `${appOrigin}/app/auth/sign-up`;
 
 const faqs = [
   {

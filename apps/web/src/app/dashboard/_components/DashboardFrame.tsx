@@ -72,7 +72,7 @@ export function DashboardFrame({ email, active, children }: { email: string; act
     return () => window.removeEventListener("storage", syncVerification);
   }, [email]);
 
-  const profilePictureLink = (className: string) => (
+  const profilePictureLink = (className: string | undefined) => (
     <Link className={className} href={settingsHref} aria-label="Open account">
       {profilePicture ? <Image src={profilePicture} alt="" width={44} height={44} unoptimized /> : <span>{email.slice(0, 1).toUpperCase() || "A"}</span>}
     </Link>
