@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 310 76" role="img" aria-labelledby="title">
+  <title id="title">StudentSave — Save Smart, Spend Wisely</title>
+  <g transform="translate(2 1)">
+    <path d="M3 23 37 9l34 14-34 14L3 23Z" fill="#137d75"/>
+    <path d="M14 29v13c12 11 34 11 46 0V29L37 39 14 29Z" fill="#0d6f69"/>
+    <path d="M68 23v17" fill="none" stroke="#137d75" stroke-linecap="round" stroke-width="3"/>
+    <circle cx="68" cy="44" r="4" fill="#83e47c"/>
+    <circle cx="59" cy="56" r="12" fill="#83e47c" stroke="#137d75" stroke-width="2"/>
+    <path d="M59 48v16m4-12c-.8-1.4-2-2-4-2-2.4 0-4 1.3-4 3s1.4 2.5 4 3 4 1.2 4 3-1.6 3-4 3c-2 0-3.6-.7-4.5-2" fill="none" stroke="#0d6f69" stroke-linecap="round" stroke-width="1.7"/>
+  </g>
+  <text x="87" y="36" fill="#0d6f69" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="800" letter-spacing="-1.3">Student</text>
+  <text x="185" y="36" fill="#137d75" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="800" letter-spacing="-1.3">Save</text>
+  <text x="88" y="57" fill="#52645b" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="600" letter-spacing=".35">Save Smart, Spend Wisely</text>
+</svg>

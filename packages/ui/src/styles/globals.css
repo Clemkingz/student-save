@@ -1,0 +1,165 @@
+@theme inline {
+  --color-primary-100: var(--primary-100);
+  --color-primary-200: var(--primary-200);
+  --color-primary-300: var(--primary-300);
+  --color-primary-400: var(--primary-400);
+  --color-primary-500: var(--primary-500);
+  --color-primary-600: var(--primary-600);
+  --color-primary-700: var(--primary-700);
+  --color-primary-800: var(--primary-800);
+  --color-primary-900: var(--primary-900);
+  --color-secondary-100: var(--secondary-100);
+  --color-secondary-200: var(--secondary-200);
+  --color-secondary-300: var(--secondary-300);
+  --color-secondary-400: var(--secondary-400);
+  --color-secondary-500: var(--secondary-500);
+  --color-secondary-600: var(--secondary-600);
+  --color-secondary-700: var(--secondary-700);
+  --color-secondary-800: var(--secondary-800);
+  --color-secondary-900: var(--secondary-900);
+  --color-neutral-100: var(--neutral-100);
+  --color-neutral-200: var(--neutral-200);
+  --color-neutral-300: var(--neutral-300);
+  --color-neutral-400: var(--neutral-400);
+  --color-neutral-500: var(--neutral-500);
+  --color-neutral-600: var(--neutral-600);
+  --color-neutral-700: var(--neutral-700);
+  --color-neutral-800: var(--neutral-800);
+  --color-neutral-900: var(--neutral-900);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+}
+
+:root {
+  color-scheme: light;
+
+  /* StudentSave brand colors from the supplied visual reference. */
+  --brand-forest: #0d6f69;
+  --brand-green: #137d75;
+  --brand-green-bright: #15938a;
+  --brand-lime: #83e47c;
+  --brand-mint: #dff5f2;
+
+  --primary-900: #052b29;
+  --primary-800: #07403c;
+  --primary-700: #095d57;
+  --primary-600: #137d75;
+  --primary-500: #15938a;
+  --primary-400: #48b5ac;
+  --primary-300: #83d9d1;
+  --primary-200: #b7ebe7;
+  --primary-100: #dff5f2;
+
+  /* Peakline's gold secondary ramp. */
+  --secondary-900: #4c3f07;
+  --secondary-800: #655409;
+  --secondary-700: #977d0d;
+  --secondary-600: #caa712;
+  --secondary-500: #fcd116;
+  --secondary-400: #fdda45;
+  --secondary-300: #fde373;
+  --secondary-200: #feeda2;
+  --secondary-100: #fef6d0;
+
+  /* Peakline's tinted black / neutral ramp. */
+  --neutral-900: #050807;
+  --neutral-800: #060b0a;
+  --neutral-700: #0a110e;
+  --neutral-600: #0d1613;
+  --neutral-500: #101c18;
+  --neutral-400: #404946;
+  --neutral-300: #707774;
+  --neutral-200: #9fa4a2;
+  --neutral-100: #cfd2d1;
+
+  /* Peakline semantic ramps. */
+  --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-200: #bbf7d0;
+  --success-300: #86efac;
+  --success-400: #4ade80;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+  --success-800: #166534;
+  --success-900: #14532d;
+
+  --danger-50: #fef2f2;
+  --danger-100: #fee2e2;
+  --danger-200: #fecaca;
+  --danger-300: #fca5a5;
+  --danger-400: #f87171;
+  --danger-500: #ef4444;
+  --danger-600: #dc2626;
+  --danger-700: #b91c1c;
+  --danger-800: #991b1b;
+  --danger-900: #7f1d1d;
+
+  --warning-50: #fefce8;
+  --warning-100: #fef9c3;
+  --warning-200: #fef08a;
+  --warning-300: #fde047;
+  --warning-400: #facc15;
+  --warning-500: #eab308;
+  --warning-600: #ca8a04;
+  --warning-700: #a16207;
+  --warning-800: #854d0e;
+  --warning-900: #713f12;
+
+  --info-50: #eff6ff;
+  --info-100: #dbeafe;
+  --info-200: #bfdbfe;
+  --info-300: #93c5fd;
+  --info-400: #60a5fa;
+  --info-500: #3b82f6;
+  --info-600: #2563eb;
+  --info-700: #1d4ed8;
+  --info-800: #1e40af;
+  --info-900: #1e3a8a;
+
+  --white: #ffffff;
+  --black: #050807;
+  --background: #ffffff;
+  --foreground: #131927;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --primary: var(--brand-green);
+  --primary-foreground: var(--white);
+  --secondary: var(--secondary-500);
+  --secondary-foreground: var(--black);
+  --muted: #f4f6f5;
+  --muted-foreground: var(--neutral-400);
+  --accent: var(--brand-mint);
+  --accent-foreground: var(--primary-800);
+  --danger: var(--danger-600);
+  --success: var(--success-600);
+  --warning: var(--warning-500);
+  --border: #dfe9e3;
+  --ring: var(--brand-green-bright);
+  --radius: 0.875rem;
+
+  /* Aliases used by the app styles. */
+  --color-ink: var(--foreground);
+  --color-muted: #6b7b74;
+  --color-paper: #f8fbf9;
+  --color-surface: var(--white);
+  --color-line: var(--border);
+  --color-primary: var(--brand-green);
+  --color-primary-soft: var(--brand-mint);
+  --color-warm: var(--secondary-100);
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { min-height: 100%; background: var(--color-paper); scroll-behavior: smooth; }
+body { min-height: 100vh; margin: 0; color: var(--color-ink); background: var(--color-paper); font-family: var(--font-sans); }
+button, a { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--brand-green-bright); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
