@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { DashboardFrame } from "../_components/DashboardFrame";
+import { saveFinance, withFinanceLock } from "../_components/financeStorage";
 import { getMockTransactions, localDateValue, type MockTransaction } from "../_components/mockFinance";
 import { MockReceipt } from "../_components/MockReceipt";
 import { TransactionSuccessPopup } from "../_components/TransactionSuccessPopup";
@@ -41,7 +42,7 @@ function AddFundsContent() {
 
   const balance = Math.max(0, transactions.reduce((sum, item) => sum + (item.type === "income" ? item.amount : -item.amount), 0));
 
-  function recordFunds(event: FormEvent<HTMLFormElement>) {
+  async function recordFunds(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const numericAmount = Number(amount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
@@ -49,6 +50,7 @@ function AddFundsContent() {
       setNotice("");
       return;
     }
+    try { await withFinanceLock(email, () => {
     const transaction: MockTransaction = {
       id: crypto.randomUUID(),
       amount: Math.round(numericAmount * 100) / 100,
@@ -59,8 +61,8 @@ function AddFundsContent() {
       receiptNumber: `SS-${Date.now()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
       receiptCreatedAt: new Date().toISOString(),
     };
-    const nextTransactions = [transaction, ...transactions];
-    localStorage.setItem(`studentsave:transactions:${email}`, JSON.stringify(nextTransactions));
+    const nextTransactions = [transaction, ...getMockTransactions(email)];
+    saveFinance(email, { [`studentsave:transactions:${email}`]: nextTransactions });
     setTransactions(nextTransactions);
     setAmount("");
     setNote("");
@@ -68,6 +70,7 @@ function AddFundsContent() {
     setNotice("Funds added successfully.");
     setSuccessfulTransaction(transaction);
     setSuccessToast({ id: crypto.randomUUID(), message: "Funds added successfully!" });
+    }); } catch { setError("Funds could not be saved. Check browser storage and try again."); }
   }
 
   async function copyAccountNumber() {

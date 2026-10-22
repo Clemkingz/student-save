@@ -1,6 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { readFinanceList, saveFinance, withFinanceLock } from "../_components/financeStorage";
+import { cents, walletCents } from "../_components/savingsAutomation";
 import { Eye, EyeOff } from "lucide-react";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { TransactionSuccessPopup } from "../_components/TransactionSuccessPopup";
@@ -19,6 +21,8 @@ type Commitment = {
   description: string;
   createdAt: string;
   withdrawnAt?: string;
+  withdrawalFee?: number;
+  withdrawalNet?: number;
 };
 
 const lockPlans = [1, 2, 3, 6, 12];
@@ -52,6 +56,9 @@ function getTermProgress(startDate: string, endDate: string) {
 function LockSavingsContent() {
   const { email, ready } = useDashboardSession();
   const storageKey = `studentsave:lock-commitments:${email}`;
+  const [collectionId, setCollectionId] = useState("");
+  const [collectionPin, setCollectionPin] = useState("");
+  const [saving, setSaving] = useState(false);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [walletBalance, setWalletBalance] = useState(0);
   const [planMonths, setPlanMonths] = useState(1);
@@ -67,47 +74,47 @@ function LockSavingsContent() {
 
   useEffect(() => {
     if (!ready || !email) return;
-    const transactions = getMockTransactions(email);
-    const income = transactions.filter((transaction) => transaction.type === "income").reduce((sum, transaction) => sum + transaction.amount, 0);
-    const expenses = transactions.filter((transaction) => transaction.type === "expense").reduce((sum, transaction) => sum + transaction.amount, 0);
-    setWalletBalance(Math.max(0, income - expenses));
-
-    const saved = localStorage.getItem(storageKey);
-    if (!saved) return;
-    try {
-      const parsed = JSON.parse(saved) as Commitment[];
-      setCommitments(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      localStorage.removeItem(storageKey);
-      setCommitments([]);
-    }
+    const refresh = () => {
+      try {
+        setWalletBalance(Math.max(0, walletCents(getMockTransactions(email))) / 100);
+        setCommitments(readFinanceList<Commitment>(storageKey));
+      } catch { setError("Your savings records could not be loaded. Please reload and try again."); }
+    };
+    refresh();
+    window.addEventListener("storage", refresh);
+    return () => window.removeEventListener("storage", refresh);
   }, [email, ready, storageKey]);
 
   const totalTarget = commitments.reduce((sum, commitment) => sum + commitment.targetAmount, 0);
   const totalLocked = commitments.reduce((sum, commitment) => sum + (commitment.withdrawnAt ? 0 : commitment.lockedAmount), 0);
 
-  function withdrawCommitment(commitmentId: string) {
-    const commitment = commitments.find((item) => item.id === commitmentId);
-    if (!commitment || commitment.withdrawnAt) return;
-    if (localDateValue() < commitment.endDate) return;
-
-    const transactions = getMockTransactions(email);
-    const withdrawal: MockTransaction = {
-      id: crypto.randomUUID(),
-      type: "income",
-      amount: commitment.lockedAmount,
-      category: "Lock Savings Withdrawal",
-      date: localDateValue(),
-      note: commitment.description || `${commitment.planMonths}-month lock savings matured`,
-    };
-    const updatedCommitments = commitments.map((item) => item.id === commitmentId ? { ...item, withdrawnAt: new Date().toISOString() } : item);
-    localStorage.setItem(`studentsave:transactions:${email}`, JSON.stringify([withdrawal, ...transactions]));
-    localStorage.setItem(storageKey, JSON.stringify(updatedCommitments));
-    setCommitments(updatedCommitments);
-    setWalletBalance((balance) => balance + commitment.lockedAmount);
-    setNotice(`${money(commitment.lockedAmount)} withdrawn to your available balance.`);
-    setSuccessToast({ id: crypto.randomUUID(), message: "Lock savings withdrawn!" });
-    setError("");
+  async function withdrawCommitment(event: FormEvent<HTMLFormElement>, commitmentId: string) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await withFinanceLock(email, async () => {
+        if (!(await verifyTransactionPin(email, collectionPin))) throw new Error("Enter your correct 4-digit transaction PIN to collect these savings.");
+        const transactions = getMockTransactions(email);
+        const current = readFinanceList<Commitment>(storageKey);
+        const commitment = current.find(item => item.id === commitmentId);
+        if (!commitment || commitment.withdrawnAt) throw new Error("These savings have already been collected or are unavailable.");
+        if (!Number.isFinite(commitment.lockedAmount) || cents(commitment.lockedAmount) <= 0) throw new Error("There are no locked funds to collect.");
+        const gross = cents(commitment.lockedAmount);
+        const fee = Math.round(gross * .05);
+        const net = (gross - fee) / 100;
+        const date = localDateValue();
+        const withdrawal: MockTransaction = { id: `lock-collection:${commitment.id}`, type: "income", amount: gross / 100, category: "Lock Savings Withdrawal", date, note: commitment.description || "Collected locked savings" };
+        const feeTransaction: MockTransaction = { id: `lock-collection-fee:${commitment.id}`, type: "expense", amount: fee / 100, category: "Lock Savings Fee", date, note: "5% collection fee" };
+        saveFinance(email, {
+          [`studentsave:transactions:${email}`]: [withdrawal, ...(fee > 0 ? [feeTransaction] : []), ...transactions],
+          [storageKey]: current.map(item => item.id === commitmentId ? { ...item, withdrawnAt: new Date().toISOString(), withdrawalFee: fee / 100, withdrawalNet: net } : item),
+        });
+        setNotice(`${money(net)} returned to your available balance after the ${money(fee / 100)} collection fee (5%).`);
+      });
+      setCollectionId(""); setCollectionPin(""); setError("");
+      setSuccessToast({ id: crypto.randomUUID(), message: "Locked savings collected!" });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not collect these savings."); }
+    finally { setSaving(false); }
   }
 
   async function createCommitment(event: FormEvent<HTMLFormElement>) {
@@ -123,61 +130,23 @@ function LockSavingsContent() {
       setNotice("");
       return;
     }
-    const roundedTarget = Math.round(target * 100) / 100;
-    const transactions = getMockTransactions(email);
-    const income = transactions.filter((transaction) => transaction.type === "income").reduce((sum, transaction) => sum + transaction.amount, 0);
-    const expenses = transactions.filter((transaction) => transaction.type === "expense").reduce((sum, transaction) => sum + transaction.amount, 0);
-    const currentBalance = Math.max(0, income - expenses);
-    if (Math.round(roundedTarget * 100) > Math.round(currentBalance * 100)) {
-      setError(`Your tracked wallet balance is ${money(currentBalance)}. Lower the commitment amount to continue.`);
-      setNotice("");
-      return;
-    }
-    if (!startDate) {
-      setError("Choose a start date.");
-      setNotice("");
-      return;
-    }
-    if (!/^\d{4}$/.test(transactionPin)) {
-      setError("Enter your 4-digit transaction PIN to lock these funds.");
-      setNotice("");
-      return;
-    }
-    if (!(await verifyTransactionPin(email, transactionPin))) {
-      setError("That transaction PIN is incorrect.");
-      setNotice("");
-      return;
-    }
-
-    const commitment: Commitment = {
-      id: crypto.randomUUID(),
-      planMonths,
-      targetAmount: roundedTarget,
-      lockedAmount: roundedTarget,
-      startDate,
-      endDate,
-      description: description.trim(),
-      createdAt: new Date().toISOString(),
-    };
-    const lockTransaction: MockTransaction = {
-      id: crypto.randomUUID(),
-      type: "expense",
-      amount: roundedTarget,
-      category: "Lock Savings",
-      date: localDateValue(),
-      note: description.trim() || `${planMonths}-month lock savings commitment`,
-    };
-    const nextCommitments = [commitment, ...commitments];
-    localStorage.setItem(`studentsave:transactions:${email}`, JSON.stringify([lockTransaction, ...transactions]));
-    localStorage.setItem(storageKey, JSON.stringify(nextCommitments));
-    setWalletBalance(currentBalance - roundedTarget);
-    setCommitments(nextCommitments);
-    setTargetAmount("");
-    setDescription("");
-    setTransactionPin("");
-    setError("");
-    setNotice(`${money(roundedTarget)} locked until ${readableDate(endDate)}.`);
-    setSuccessToast({ id: crypto.randomUUID(), message: "Savings locked successfully!" });
+    if (!startDate || !endDate || cents(target) < 1) { setError("Choose a valid start date and an amount of at least ₦0.01."); return; }
+    setSaving(true);
+    try {
+      await withFinanceLock(email, async () => {
+        if (!(await verifyTransactionPin(email, transactionPin))) throw new Error("Enter your correct 4-digit transaction PIN to lock these funds.");
+        const transactions = getMockTransactions(email);
+        const currentBalance = walletCents(transactions);
+        if (cents(target) > currentBalance) throw new Error(`Your available balance is ${money(Math.max(0, currentBalance) / 100)}. Add funds or lower the amount.`);
+        const commitment: Commitment = { id: crypto.randomUUID(), planMonths, targetAmount: cents(target) / 100, lockedAmount: cents(target) / 100, startDate, endDate, description: description.trim(), createdAt: new Date().toISOString() };
+        const transaction: MockTransaction = { id: crypto.randomUUID(), type: "expense", amount: commitment.lockedAmount, category: "Lock Savings", date: localDateValue(), note: description.trim() || `${planMonths}-month lock savings commitment` };
+        saveFinance(email, { [`studentsave:transactions:${email}`]: [transaction, ...transactions], [storageKey]: [commitment, ...readFinanceList<Commitment>(storageKey)] });
+      });
+      setTargetAmount(""); setDescription(""); setTransactionPin(""); setError("");
+      setNotice(`${money(cents(target) / 100)} locked until ${readableDate(endDate)}. Collection at any time carries a 5% fee.`);
+      setSuccessToast({ id: crypto.randomUUID(), message: "Savings locked successfully!" });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not lock these funds."); }
+    finally { setSaving(false); }
   }
 
   if (!ready) return <main className={styles.mainContent} aria-live="polite">Loading lock savings…</main>;
@@ -189,7 +158,9 @@ function LockSavingsContent() {
         <p>Choose a term, set a target, and track your progress.</p>
       </header>
 
-      <p className={styles.lockBalanceNotice}>Available wallet balance: <strong>{money(walletBalance)}</strong>. The commitment amount is deducted from your tracked balance when created.</p>
+      <p className={styles.lockBalanceNotice}>Available wallet balance: <strong>{money(walletBalance)}</strong>. The amount is deducted when locked. You can collect it at any time with a 5% fee, including after maturity.</p>
+
+      {notice && <p className={styles.goalNotice} role="status">{notice}</p>}
 
       <section className={styles.lockSummary} aria-label="Commitment totals">
         <article className={styles.statCard + " " + styles.balanceCard}><p>Commitment targets</p><strong>{money(totalTarget)}</strong><small>{commitments.length ? `${commitments.length} commitment${commitments.length === 1 ? "" : "s"}` : "No commitments yet"}</small></article>
@@ -230,8 +201,7 @@ function LockSavingsContent() {
             <span className={styles.transactionFootnote}>Use the personal PIN you created when setting up your wallet.</span>
           </div>
           {error && <p className={styles.goalError} role="alert">{error}</p>}
-          {notice && <p className={styles.goalNotice} role="status">{notice}</p>}
-          <button className={styles.primaryAction} type="submit">Lock savings</button>
+          <button className={styles.primaryAction} type="submit" disabled={saving}>Lock savings</button>
         </form>
 
         <section className={styles.panel + " " + styles.commitmentPanel}>
@@ -242,13 +212,24 @@ function LockSavingsContent() {
                 const progress = getTermProgress(commitment.startDate, commitment.endDate);
                 const complete = progress >= 100;
                 const withdrawn = Boolean(commitment.withdrawnAt);
-                const due = localDateValue() >= commitment.endDate;
+                const fee = Math.round(cents(commitment.lockedAmount) * .05) / 100;
+                const net = (cents(commitment.lockedAmount) - cents(fee)) / 100;
                 return (
                   <article className={styles.commitmentItem} key={commitment.id}>
                     <div className={styles.commitmentHeading}><strong>{commitment.description || `${commitment.planMonths}-month lock`}</strong><span>{money(commitment.lockedAmount)} {withdrawn ? "withdrawn" : "locked"}</span></div>
                     <div className={styles.progressTrack} role="progressbar" aria-label={`${commitment.planMonths}-month lock progress`} aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}><div className={styles.progressBar} style={{ width: `${progress}%` }} /></div>
                     <p>{complete ? "Term complete" : `${Math.floor(progress)}% of lock term`} · {readableDate(commitment.startDate)} – {readableDate(commitment.endDate)}</p>
-                    <button className={styles.secondaryAction} type="button" disabled={!due || withdrawn} onClick={() => withdrawCommitment(commitment.id)}>{withdrawn ? "Withdrawn" : "Withdrawal"}</button>
+                    {!withdrawn && <p>Collection fee (5%): {money(fee)} · You receive {money(net)}</p>}
+                    {withdrawn && commitment.withdrawalNet !== undefined && <p>Collected {money(commitment.withdrawalNet)} · Fee {money(commitment.withdrawalFee || 0)}</p>}
+                    <button className={styles.secondaryAction} type="button" disabled={withdrawn || saving} onClick={() => { setCollectionId(commitment.id); setCollectionPin(""); setError(""); }}>{withdrawn ? "Collected" : "Collect savings"}</button>
+                    {collectionId === commitment.id && !withdrawn && <form className={styles.scheduleAuthorization} onSubmit={event => withdrawCommitment(event, commitment.id)}>
+                      <p>Confirm collection of {money(commitment.lockedAmount)}. A 5% fee of {money(fee)} will be deducted; {money(net)} returns to your balance.</p>
+                      <label htmlFor={`collection-pin-${commitment.id}`}>Transaction PIN</label>
+                      <input id={`collection-pin-${commitment.id}`} type="password" inputMode="numeric" maxLength={4} autoComplete="off" value={collectionPin} onChange={event => setCollectionPin(event.target.value.replace(/\D/g, "").slice(0, 4))} />
+                      {error && <p className={styles.goalError} role="alert">{error}</p>}
+                      <button className={styles.primaryAction} type="submit" disabled={saving}>{saving ? "Collecting…" : `Confirm · receive ${money(net)}`}</button>
+                      <button className={styles.secondaryAction} type="button" disabled={saving} onClick={() => setCollectionId("")}>Cancel</button>
+                    </form>}
                   </article>
                 );
               })}

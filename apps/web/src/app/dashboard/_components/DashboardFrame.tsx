@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChartNoAxesCombined, CircleDollarSign, LayoutDashboard, LockKeyhole, ReceiptText, Settings2, Target, WalletCards } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { SavingsAutomation } from "./SavingsAutomationNotice";
 import styles from "../dashboard.module.css";
 
 const navIcons = {
@@ -98,6 +99,7 @@ export function DashboardFrame({ email, active, children }: { email: string; act
 
       <main className={styles.mainContent}>
         <div className={styles.dashboardTopBar}>{needsStudentVerification && <aside className={styles.verificationTopMessage}><strong>Student verification needed to access dashboard</strong><Link href={`/dashboard/student-verification?email=${encodeURIComponent(email)}`}>Verify student account →</Link></aside>}{active !== "Dashboard" && profilePictureLink(styles.profileAvatar)}</div>
+        {!needsStudentVerification && <SavingsAutomation email={email} />}
         {children}
       </main>
 

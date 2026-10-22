@@ -11,7 +11,7 @@ import styles from "../dashboard.module.css";
 type Range = "month" | "30days" | "custom";
 type Budget = { id: string; category: string; amount: number; month: string; createdAt: string };
 type Goal = { id: string; name: string; targetAmount: number; savedAmount: number; createdAt: string; dueDate: string };
-type Contribution = { id: string; goalId: string; amount: number; frequency: string; date: string; createdAt: string };
+type Contribution = { id: string; goalId: string; amount: number; frequency: string; date: string; createdAt: string; transactionId?: string };
 type Commitment = { id: string; planMonths: number; targetAmount: number; lockedAmount: number; startDate: string; endDate: string; description: string; createdAt: string };
 type ReportActivity = { id: string; title: string; detail: string; amount: number; date: string; kind: string; transaction?: MockTransaction };
 type ReportAlert = { id: string; title: string; detail: string; receipt?: MockTransaction };
@@ -62,8 +62,13 @@ function ReportsContent() {
   useEffect(() => {
     if (!ready || !email) return;
     const transactionsKey = `studentsave:transactions:${email}`;
-    const refreshTransactions = () => setTransactions(getMockTransactions(email));
-    const handleStorage = (event: StorageEvent) => { if (event.key === transactionsKey) refreshTransactions(); };
+    const refreshTransactions = () => {
+      setTransactions(getMockTransactions(email));
+      setGoals(readList<Goal>(`${keys.goals}${email}`));
+      setContributions(readList<Contribution>(`${keys.contributions}${email}`));
+      setCommitments(readList<Commitment>(`${keys.locks}${email}`));
+    };
+    const handleStorage = (event: StorageEvent) => { if (event.key === transactionsKey || event.key === `${keys.goals}${email}` || event.key === `${keys.contributions}${email}` || event.key === `${keys.locks}${email}`) refreshTransactions(); };
     refreshTransactions();
     window.addEventListener("storage", handleStorage);
     setBudgets(readList<Budget>(`${keys.budgets}${email}`));
@@ -101,6 +106,7 @@ function ReportsContent() {
     budgets.forEach((item) => items.push({ id: `budget-${item.id}`, title: `${item.category} budget`, detail: `Budget created · ${item.month}`, amount: item.amount, date: item.createdAt?.slice(0, 10) || `${item.month}-01`, kind: "Budget" }));
     goals.forEach((item) => items.push({ id: `goal-${item.id}`, title: item.name, detail: `Savings goal created${item.dueDate ? ` · due ${dateLabel(item.dueDate)}` : ""}`, amount: item.targetAmount, date: item.createdAt?.slice(0, 10) || dateValue(new Date()), kind: "Savings goal" }));
     contributions.forEach((item) => {
+      if (transactions.some(transaction => transaction.id === item.transactionId || transaction.id === `savings-contribution:${item.id}`)) return;
       const goalName = goals.find((goal) => goal.id === item.goalId)?.name || "Savings goal";
       items.push({ id: `contribution-${item.id}`, title: goalName, detail: `${item.frequency} contribution recorded`, amount: item.amount, date: item.date || item.createdAt?.slice(0, 10) || dateValue(new Date()), kind: "Contribution" });
     });

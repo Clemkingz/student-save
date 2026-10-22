@@ -1,3 +1,5 @@
+import { recoverFinance } from "./financeStorage";
+
 export type MockTransaction = {
   id: string;
   type: "expense" | "income";
@@ -19,6 +21,7 @@ export function localDateValue(daysAgo = 0) {
 }
 
 export function getMockTransactions(email: string): MockTransaction[] {
+  recoverFinance(email);
   const storageKey = `studentsave:transactions:${email}`;
   const resetKey = `studentsave:mock-finance-reset-v1:${email}`;
 

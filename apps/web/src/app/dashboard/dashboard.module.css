@@ -586,3 +586,12 @@
 }
 .mainContent .accountCard:hover, .mainContent .statGrid > .statCard:hover, .mainContent .contentGrid > .panel:hover { border-color: #d8d8de; box-shadow: 0 8px 24px #0000000c; transform: translateY(-2px); }
 .mainContent .primaryAction:hover, .mainContent .secondaryAction:hover, .mainContent .createBudgetButton:hover, .mainContent .transactionTab:hover, .mainContent .transactionTabActive:hover { box-shadow: 0 6px 16px #137d7518; transform: translateY(-1px); }
+
+.savingsBalancePrompt { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; padding: 14px 17px; border: 1px solid #f1d39d; border-radius: 13px; color: #805411; background: #fff8e9; font-size: 13px; line-height: 1.5; }
+.savingsBalancePrompt span { flex: 1 1 220px; }
+.savingsBalancePrompt a { color: #116b65; font-weight: 700; }
+
+.scheduleAuthorization { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; padding: 14px; border: 1px solid #d6e5df; border-radius: 12px; background: #f6faf8; }
+.scheduleAuthorization p { flex-basis: 100%; }
+.scheduleAuthorization label { color: #536177; font-size: 13px; }
+.scheduleAuthorization input { width: 130px; max-width: 100%; min-height: 44px; padding: 10px; border: 1px solid #cbd8d1; border-radius: 9px; font: inherit; }

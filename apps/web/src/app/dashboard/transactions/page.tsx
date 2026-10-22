@@ -6,6 +6,8 @@ import { DashboardFrame } from "../_components/DashboardFrame";
 import { MockReceipt } from "../_components/MockReceipt";
 import { TransactionSuccessPopup } from "../_components/TransactionSuccessPopup";
 import { getMockTransactions, localDateValue, type MockTransaction } from "../_components/mockFinance";
+import { saveFinance, withFinanceLock } from "../_components/financeStorage";
+import { walletCents } from "../_components/savingsAutomation";
 import { verifyTransactionPin } from "../_components/transactionPin";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
@@ -75,7 +77,7 @@ function TransactionContent() {
     setNotice("");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!category) {
       setError("Choose a transaction category.");
@@ -96,6 +98,7 @@ function TransactionContent() {
     }
 
     if (type === "income") {
+      try { await withFinanceLock(email, () => {
       const transaction: Transaction = {
         id: crypto.randomUUID(),
         amount: Math.round(numericAmount * 100) / 100,
@@ -106,8 +109,8 @@ function TransactionContent() {
         receiptNumber: `SS-${Date.now()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
         receiptCreatedAt: new Date().toISOString(),
       };
-      const nextTransactions = [transaction, ...transactions];
-      localStorage.setItem(storageKey, JSON.stringify(nextTransactions));
+      const nextTransactions = [transaction, ...getMockTransactions(email)];
+      saveFinance(email, { [storageKey]: nextTransactions });
       setTransactions(nextTransactions);
       setAmount("");
       setNote("");
@@ -115,6 +118,7 @@ function TransactionContent() {
       setNotice("Funds added successfully.");
       setSuccessfulTransaction(transaction);
       setSuccessToast({ id: crypto.randomUUID(), message: "Funds added successfully!" });
+      }); } catch { setError("Funds could not be saved. Check browser storage and try again."); }
       return;
     }
 
@@ -177,9 +181,12 @@ function TransactionContent() {
       setPaymentError("That transaction PIN is incorrect.");
       return;
     }
+    try { await withFinanceLock(email, () => {
+    const latest = getMockTransactions(email);
+    const currentBalance = Math.max(0, walletCents(latest)) / 100;
     const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || numericAmount > balance) {
-      setPaymentError(`This payment is above your available balance of ${formatAmount(balance)}. Check the amount and try again.`);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || numericAmount > currentBalance) {
+      setPaymentError(`This payment is above your available balance of ${formatAmount(currentBalance)}. Check the amount and try again.`);
       return;
     }
     const selectedBank = banks.find((bank) => bank.code === recipientBankCode);
@@ -196,8 +203,8 @@ function TransactionContent() {
       receiptNumber: `SS-${Date.now()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
       receiptCreatedAt: new Date().toISOString(),
     };
-    const nextTransactions = [transaction, ...transactions];
-    localStorage.setItem(storageKey, JSON.stringify(nextTransactions));
+    const nextTransactions = [transaction, ...latest];
+    saveFinance(email, { [storageKey]: nextTransactions });
     setTransactions(nextTransactions);
     setAmount("");
     setNote("");
@@ -214,6 +221,7 @@ function TransactionContent() {
     setShowPinDialog(false);
     setSuccessfulTransaction(transaction);
     setSuccessToast({ id: crypto.randomUUID(), message: type === "withdrawal" ? "Withdrawal successful!" : "Payment successful!" });
+    }); } catch { setPaymentError("Payment could not be saved. Check browser storage and try again."); }
   }
 
   const recentTransactions = transactions.filter((transaction) => type === "income" ? transaction.type === "income" : type === "withdrawal" ? transaction.type === "expense" && transaction.category === "Withdrawal" : transaction.type === "expense" && transaction.category !== "Withdrawal").slice(0, 8);

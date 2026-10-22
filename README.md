@@ -52,3 +52,11 @@ Optional configuration:
 ## Product notes
 
 See [the PRD summary](docs/PRD-SUMMARY.md) for the product scope, important money-language rules, calculations, journeys, and decisions that need confirmation.
+
+## Savings behavior
+
+Savings Goals support PIN-authorized automatic daily or monthly contributions from the shared tracked balance. New schedules start next period; existing goals require enabling automatic savings. Schedules can be paused. Due contributions catch up when the app opens and while it remains open, stop at the target, and wait for a top-up when funds are insufficient. A dashboard prompt links to Add funds. Monthly schedules preserve the selected day, clamping shorter months to their last day.
+
+Lock Savings can be collected at any time, including before maturity, after PIN confirmation. A 5% fee applies to every collection and is rounded to the nearest kobo. The preview shows gross savings, fee, and net payout. The ledger records the gross return and fee separately, and a collected commitment cannot be collected again.
+
+These are browser-local demo records. Contributions do not execute while the browser is closed; reliable background scheduling and real transfers require a backend. Previous manually recorded goal contributions are migrated once into the common transaction ledger so all pages show the same available balance.

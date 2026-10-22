@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { runSavingsAutomation } from "./runSavingsAutomation";
+
 export type DashboardWallet = {
   accountNumber: string;
   accountName?: string;
@@ -22,6 +24,7 @@ export function useDashboardSession() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const currentEmail = requestedEmail || localStorage.getItem("studentsave:active-email")?.toLowerCase() || "";
     if (!currentEmail) {
       router.replace("/auth/sign-up");
@@ -56,10 +59,11 @@ export function useDashboardSession() {
       setEmail(currentEmail);
       setWallet(parsedWallet);
       setProfilePicture(localStorage.getItem(`studentsave:profile-picture:${currentEmail}`) || "");
-      setReady(true);
+      void runSavingsAutomation(currentEmail).catch(() => undefined).then(() => { if (!cancelled) setReady(true); });
     } catch {
       router.replace(`/auth/wallet-setup?email=${encodeURIComponent(currentEmail)}`);
     }
+    return () => { cancelled = true; };
   }, [pathname, requestedEmail, router]);
 
   return { email, wallet, profilePicture, ready };
