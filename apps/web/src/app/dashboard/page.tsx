@@ -5,6 +5,7 @@ import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { DashboardFrame } from "./_components/DashboardFrame";
 import { MoneyFlowChart } from "./_components/MoneyFlowChart";
+import { SchoolStatusBar } from "./_components/SchoolStatusBar";
 import { getMockTransactions, type MockTransaction } from "./_components/mockFinance";
 import { useDashboardSession } from "./_components/useDashboardSession";
 import styles from "./dashboard.module.css";
@@ -83,6 +84,8 @@ function DashboardContent() {
         <h1>Dashboard</h1>
         <p>{season}. Your finances at a glance.</p>
       </header>
+
+      <SchoolStatusBar />
 
       <section className={styles.accountCard} aria-label="Dashboard greeting and balance">
         <div className={styles.accountDetails}>

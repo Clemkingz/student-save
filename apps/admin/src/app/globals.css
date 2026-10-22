@@ -22,6 +22,15 @@
 .admin-heading p { margin: 0; color: #758198; font-size: 14px; line-height: 1.5; }
 .admin-refresh { min-height: 41px; padding: 0 14px; border: 1px solid #e1e7ec; border-radius: 11px; color: #116b65; background: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
 .admin-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 21px; }
+.admin-school-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 21px; padding: 18px; border: 1px solid #e1e7ec; border-radius: 15px; background: #fff; }
+.admin-school-status h2 { margin: 0 0 5px; font-size: 17px; }
+.admin-school-status p { margin: 0; color: #758198; font-size: 12px; line-height: 1.5; }
+.school-status-options { display: flex; flex-wrap: wrap; gap: 9px; }
+.school-status-option { display: inline-flex; min-height: 44px; align-items: center; gap: 9px; padding: 10px 14px; border: 1px solid #dce4e9; border-radius: 10px; color: #536177; background: #fff; font-size: 13px; font-weight: 650; cursor: pointer; }
+.school-status-option[aria-pressed="true"] { border-color: #137d75; color: #116b65; background: #e0f5f2; box-shadow: inset 0 0 0 1px #137d75; }
+.school-status-option:disabled { opacity: .6; cursor: wait; }
+.school-status-dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: #1a9b51; }
+.school-status-dot-out { background: #d13c3c; }
 .admin-stat { display: grid; gap: 8px; padding: 17px 18px; border: 1px solid #e1e7ec; border-radius: 15px; background: #fff; }
 .admin-stat span { color: #758198; font-size: 12px; }
 .admin-stat strong { color: #202b3d; font-size: 27px; font-variant-numeric: tabular-nums; }

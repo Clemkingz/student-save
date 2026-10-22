@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { readSchoolStatus, schoolStatusEvent, schoolStatusKey, schoolStatusLabels, type SchoolStatus } from "@repo/ui/lib/school-status";
 
 type StudentDetails = {
   institution: string;
@@ -53,6 +54,41 @@ export function StudentVerificationReview({ reviewPath = "/student-verifications
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
+  const [schoolStatus, setSchoolStatus] = useState<SchoolStatus | null>(null);
+  const [schoolStatusReady, setSchoolStatusReady] = useState(false);
+
+  useEffect(() => {
+    const refreshSchoolStatus = () => {
+      try {
+        setSchoolStatus(readSchoolStatus(localStorage));
+        setSchoolStatusReady(true);
+      } catch {
+        setSchoolStatusReady(false);
+        setNotice("School status could not be loaded. Allow browser storage and reload this page.");
+      }
+    };
+    refreshSchoolStatus();
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === schoolStatusKey || event.key === null) refreshSchoolStatus();
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(schoolStatusEvent, refreshSchoolStatus);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(schoolStatusEvent, refreshSchoolStatus);
+    };
+  }, []);
+
+  function updateSchoolStatus(status: SchoolStatus) {
+    try {
+      localStorage.setItem(schoolStatusKey, status);
+      setSchoolStatus(status);
+      window.dispatchEvent(new Event(schoolStatusEvent));
+      setNotice(`School status updated to ${schoolStatusLabels[status].toLowerCase()}.`);
+    } catch {
+      setNotice("School status could not be saved. Allow browser storage and try again.");
+    }
+  }
 
   const refreshRecords = useCallback(() => {
     try {
@@ -113,6 +149,13 @@ export function StudentVerificationReview({ reviewPath = "/student-verifications
           <div><span className="admin-eyebrow">Verification queue</span><h1>Student verification</h1><p>Review submitted school details and approve student accounts.</p></div>
           <button className="admin-refresh" type="button" onClick={refreshRecords}>Refresh submissions</button>
         </header>
+
+        <section className="admin-school-status" aria-labelledby="school-status-heading">
+          <div><h2 id="school-status-heading">School status</h2><p>Set the status shown on all student dashboards in this browser.</p></div>
+          <div className="school-status-options" role="group" aria-label="School status">
+            {(["in-school", "out-of-school"] as const).map((status) => <button key={status} type="button" className="school-status-option" aria-pressed={schoolStatusReady && schoolStatus === status} disabled={!schoolStatusReady} onClick={() => updateSchoolStatus(status)}><span className={`school-status-dot ${status === "out-of-school" ? "school-status-dot-out" : ""}`} aria-hidden="true" />{schoolStatusLabels[status]}</button>)}
+          </div>
+        </section>
 
         <section className="admin-stats" aria-label="Verification totals">
           <article className="admin-stat admin-stat-highlight"><span>Awaiting review</span><strong>{pendingCount}</strong></article>
