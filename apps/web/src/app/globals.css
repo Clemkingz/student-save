@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "@repo/ui/globals.css";
 
+@media print {
+  :where(body:has([data-studentsave-receipt])) * { visibility: hidden !important; }
+}
+
 .workspace-shell { display: grid; min-height: 100vh; align-content: center; justify-items: center; gap: 30px; padding: 36px 18px; background: var(--color-paper); }
 .workspace-shell > img { width: 205px; height: auto; }
 .workspace-card { width: min(100%, 520px); padding: clamp(24px, 6vw, 42px); border: 1px solid var(--color-line); border-radius: 22px; background: var(--white); box-shadow: 0 20px 60px #0d6f6910; }
@@ -8,6 +12,9 @@
 .workspace-card h1 { margin: 15px 0 13px; color: var(--brand-forest); font-size: clamp(38px, 7vw, 54px); line-height: 1.02; letter-spacing: -.06em; }
 .workspace-card h1 span { color: var(--primary-600); }
 .workspace-card > p { margin: 0; color: var(--neutral-400); font-size: 14px; line-height: 1.75; }
+.workspace-continue { display: inline-flex; min-height: 46px; align-items: center; justify-content: center; gap: 10px; margin-top: 24px; padding: 0 22px; border-radius: 10px; color: var(--white); background: var(--primary-600); font-size: 14px; font-weight: 700; text-decoration: none; }
+.workspace-continue:hover { background: var(--primary-700); }
+.workspace-continue:focus-visible { outline: 3px solid var(--primary-700); outline-offset: 4px; }
 .workspace-card ul { display: grid; gap: 10px; margin: 24px 0; padding: 0; list-style: none; }
 .workspace-card li { display: flex; align-items: center; gap: 11px; color: var(--neutral-600); font-size: 12px; font-weight: 650; }
 .workspace-card li span { display: grid; width: 31px; height: 31px; place-items: center; border-radius: 9px; color: var(--primary-700); background: var(--primary-100); }

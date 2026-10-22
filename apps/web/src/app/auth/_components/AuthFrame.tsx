@@ -7,7 +7,7 @@ export function AuthFrame({ children }: { children: ReactNode }) {
     <main className={styles.pageShell}>
       <aside className={styles.brandPanel}>
         <div className={styles.brandContent}>
-          <Image className={styles.lightLogo} src="/app/student-save-logo-light.svg" width={310} height={70} alt="StudentSave" />
+          <Image className={styles.lightLogo} src="/student-save-logo-light.svg" width={310} height={70} alt="StudentSave" />
           <h2>Know where your money goes.</h2>
           <ul className={styles.benefitList}>
             <li><span className={styles.bullet} aria-hidden="true">•</span><span>Record income and expenses in seconds</span></li>
@@ -17,7 +17,7 @@ export function AuthFrame({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <header className={styles.mobileHeader}>
-        <Image className={styles.darkLogo} src="/app/student-save-logo-dark.svg" width={310} height={70} alt="StudentSave" />
+        <Image className={styles.darkLogo} src="/student-save-logo-dark.svg" width={310} height={70} alt="StudentSave" />
       </header>
       <section className={styles.formPanel}>
         <div className={styles.formContent}>{children}</div>

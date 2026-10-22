@@ -1,26 +1,19 @@
 import Image from "next/image";
-import { ChartNoAxesCombined, CircleDollarSign, PiggyBank } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
-const upcomingAreas = [
-  { label: "Record income and spending", icon: CircleDollarSign },
-  { label: "Plan category budgets", icon: ChartNoAxesCombined },
-  { label: "Track savings goals", icon: PiggyBank }
-];
+const landingUrl = process.env.NEXT_PUBLIC_LANDING_URL || "/landing";
 
 export default function WorkspaceHome() {
   return (
     <main className="workspace-shell">
-      <Image src="/app/student-save-logo.svg" width={205} height={51} alt="StudentSave — Save Smart, Spend Wisely" />
+      <Image src="/student-save-logo.svg" width={205} height={51} alt="StudentSave — Save Smart, Spend Wisely" />
       <section className="workspace-card">
         <span className="workspace-kicker">Your personal money space</span>
         <h1>Your next chapter<br /><span>starts here.</span></h1>
-        <p>The StudentSave app is being prepared. Soon you’ll be able to keep track of the money you record, make a plan, and work toward your goals.</p>
-        <ul>
-          {upcomingAreas.map(({ label, icon: Icon }) => (
-            <li key={label}><span><Icon size={17} aria-hidden="true" /></span>{label}</li>
-          ))}
-        </ul>
-        <small>StudentSave records information you enter. It doesn’t connect to your bank or hold your money.</small>
+        <p>Discover how StudentSave helps you track your spending, plan your budget, and work toward your savings goals.</p>
+        <a className="workspace-continue" href={landingUrl}>
+          Continue <ArrowRight size={18} aria-hidden="true" />
+        </a>
       </section>
     </main>
   );

@@ -21,7 +21,21 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` starts the apps independently for local development. The marketing site runs at http://localhost:3002 and the product app at http://localhost:3000. To run only the public site, use `pnpm --filter landing dev`. Landing page account links use `NEXT_PUBLIC_APP_URL` from `apps/landing/.env.local` when set; otherwise development links point to the local product app. In the shared Vercel deployment, the landing site is served at `/`, the product app at `/app`, and admin at `/admin`. Run `vercel dev` to exercise the shared routing locally. Add the backend base URL to `apps/web/.env.local` as `NEXT_PUBLIC_API_URL` when it is provided; account forms are currently presentation and validation only, and do not send or save submitted details.
+`pnpm dev` starts three independent apps, following [Peakline's routing structure](https://github.com/T-laye/peakline): none uses a Next.js base path.
+
+- Web: http://localhost:3000. The welcome page's Continue button opens `/landing`.
+- Landing: http://localhost:3002. Account links open the web app at `/auth/sign-up`.
+- Admin: http://localhost:3003. Its root redirects to `/student-verifications`.
+
+The web app also serves the landing page at `/landing` and the mock verification queue at `/admin/student-verifications`, reusing the standalone apps' components. Use the review link on the student's verification page to review submissions on the **same origin**. Browser storage is isolated by origin: the standalone admin app on port 3003 cannot read submissions from port 3000. This is a local mock review flow, with no admin authentication or server verification; production verification requires an authenticated backend.
+
+The main deployment is https://student-saveus.vercel.app. The root `vercel.json` builds the web app, which serves welcome, landing, auth, dashboard, and mock admin routes together. Deploy with the repository root as the Vercel project root. The old `/app` base path and multi-service rewrites have been removed.
+
+Optional configuration:
+
+- `apps/web/.env.local`: set `NEXT_PUBLIC_LANDING_URL` to use an external landing deployment instead of `/landing`.
+- `apps/landing/.env.local` and `apps/admin/.env.local`: set `NEXT_PUBLIC_APP_URL` to the web origin. Defaults to http://localhost:3000 in development and https://student-saveus.vercel.app in production.
+- `apps/web/.env.local`: add `NEXT_PUBLIC_API_URL` when the backend is available. Current account and verification flows use browser storage.
 
 ## Product notes
 

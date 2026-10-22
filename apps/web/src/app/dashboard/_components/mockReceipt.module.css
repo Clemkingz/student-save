@@ -17,7 +17,6 @@
 .receiptNote { margin: 17px 0 0; padding: 10px 12px; border-radius: 9px; color: #176d67; background: #e0f5f2; font-size: 11px; line-height: 1.5; }
 @keyframes receiptPop { from { opacity: 0; transform: perspective(800px) translateY(18px) rotateX(2deg) scale(.98); } to { opacity: 1; transform: perspective(800px) translateY(0) rotateX(0) scale(1); } }
 @media print {
-  :global(body *) { visibility: hidden !important; }
   .receiptOverlay, .receiptOverlay * { visibility: visible !important; }
   .receiptOverlay { position: absolute; display: block; overflow: visible; padding: 0; background: #fff; backdrop-filter: none; }
   .receiptDialog { width: 100%; max-height: none; margin: 0 auto; padding: 0; border: 0; border-radius: 0; background: #fff; box-shadow: none; }

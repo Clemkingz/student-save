@@ -1,10 +1,9 @@
 @import "tailwindcss";
 @import "@repo/ui/globals.css";
 
-:root { color-scheme: light; }
-* { box-sizing: border-box; }
-body { margin: 0; color: #131927; background: #f4f6f7; font-family: Arial, Helvetica, sans-serif; }
-button, input { font: inherit; }
+.admin-shell, .admin-shell * { box-sizing: border-box; }
+.admin-shell { color: #131927; background: #f4f6f7; font-family: Arial, Helvetica, sans-serif; }
+.admin-shell :where(button, input) { font: inherit; }
 .admin-shell { display: grid; min-height: 100vh; grid-template-columns: 255px minmax(0, 1fr); }
 .admin-sidebar { position: sticky; top: 0; display: flex; height: 100vh; flex-direction: column; gap: 32px; padding: 28px 21px; border-right: 1px solid #e1e7ec; background: #fff; }
 .admin-brand { display: flex; align-items: center; gap: 11px; color: #131927; font-size: 20px; font-weight: 800; letter-spacing: -.04em; text-decoration: none; }
@@ -38,7 +37,7 @@ button, input { font: inherit; }
 .admin-review-card { display: grid; grid-template-columns: minmax(250px, .88fr) minmax(0, 1.12fr); gap: 19px; padding: 19px; border: 1px solid #e1e7ec; border-radius: 17px; background: #fff; }
 .student-info { min-width: 0; }
 .student-info-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.student-info h2 { margin: 11px 0 4px; font-size: 17px; letter-spacing: -.02em; }
+.student-info h2 { margin: 11px 0 4px; font-size: 17px; letter-spacing: -.02em; overflow-wrap: anywhere; }
 .student-email { margin: 0 0 15px; color: #758198; font-size: 12px; overflow-wrap: anywhere; }
 .status-pill { display: inline-flex; width: fit-content; padding: 6px 9px; border-radius: 999px; color: #8b4a0b; background: #fff4d9; font-size: 10px; font-weight: 800; }
 .status-pill-verified { color: #176d67; background: #e0f5f2; }
@@ -52,10 +51,11 @@ button, input { font: inherit; }
 .student-page-link { display: inline-block; margin-left: 12px; color: #116b65; font-size: 11px; font-weight: 700; text-decoration: none; }
 .student-page-link:hover { text-decoration: underline; }
 .id-preview { display: grid; align-content: start; gap: 7px; min-width: 0; }
-.id-preview img { display: block; width: 100%; max-height: 350px; object-fit: contain; border: 1px solid #e1e7ec; border-radius: 12px; background: #f4f6f7; }
+.id-preview img { display: block; width: 100%; height: auto; max-height: 350px; object-fit: contain; border: 1px solid #e1e7ec; border-radius: 12px; background: #f4f6f7; }
 .id-preview span { color: #758198; font-size: 10px; overflow-wrap: anywhere; }
 .empty-state { padding: 38px 20px; border: 1px dashed #cbd6dc; border-radius: 16px; color: #758198; background: #fff; font-size: 13px; line-height: 1.6; text-align: center; }
-.admin-notice { margin: 0 0 15px; padding: 11px 14px; border-radius: 10px; color: #176d67; background: #e0f5f2; font-size: 12px; line-height: 1.5; }
+.admin-notice { margin: 0 0 15px; padding: 11px 14px; border-radius: 10px; color: #176d67; background: #e0f5f2; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.admin-shell button:focus-visible, .admin-shell a:focus-visible { outline: 3px solid #137d75; outline-offset: 3px; }
 .fund-request-list { display: grid; gap: 13px; }
 .fund-request-card { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(220px, .9fr); align-items: center; gap: 20px; padding: 20px; border: 1px solid #e1e7ec; border-radius: 17px; background: #fff; }
 .fund-request-info { min-width: 0; }
@@ -73,13 +73,16 @@ button, input { font: inherit; }
   .admin-sidebar-note { display: none; }
   .admin-main { padding: 20px 18px 35px; }
   .admin-topbar { margin-bottom: 20px; }
+  .admin-toolbar { align-items: stretch; flex-direction: column; }
+  .admin-search { width: 100%; }
+  .admin-review-card { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
-  .admin-sidebar { padding: 10px 13px; }
+  .admin-sidebar { flex-wrap: wrap; padding: 10px 13px; }
   .admin-brand { font-size: 15px; }
   .admin-nav a { padding-inline: 9px; font-size: 11px; }
   .admin-main { padding: 17px 13px 28px; }
-  .admin-topbar { margin-bottom: 17px; }
+  .admin-topbar { align-items: flex-start; flex-wrap: wrap; margin-bottom: 17px; }
   .admin-heading { align-items: flex-start; flex-direction: column; gap: 13px; margin-bottom: 17px; }
   .admin-heading h1 { font-size: 30px; }
   .admin-stats { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
@@ -93,4 +96,8 @@ button, input { font: inherit; }
   .admin-review-card { grid-template-columns: 1fr; gap: 15px; padding: 15px; }
   .fund-request-card { grid-template-columns: 1fr; gap: 15px; padding: 15px; }
   .student-page-link { margin-left: 8px; }
+  .admin-brand-mark { flex-shrink: 0; }
+  .admin-refresh, .verify-action { min-height: 44px; }
+  .admin-filter { min-height: 44px; }
+  .student-info-top { flex-wrap: wrap; }
 }
