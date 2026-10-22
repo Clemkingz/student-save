@@ -21,7 +21,7 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` starts both apps. The marketing site runs at http://localhost:3002 and the product app at http://localhost:3000. To run only the public site, use `pnpm --filter landing dev`. Landing page account links use `NEXT_PUBLIC_APP_URL` from `apps/landing/.env.local` (defaults to `http://localhost:3000` for local development). Add the backend base URL to `apps/web/.env.local` as `NEXT_PUBLIC_API_URL` when it is provided; account forms are currently presentation and validation only, and do not send or save submitted details.
+`pnpm dev` starts the apps independently for local development. The marketing site runs at http://localhost:3002 and the product app at http://localhost:3000. To run only the public site, use `pnpm --filter landing dev`. In the shared Vercel deployment, the landing site is served at `/`, the product app at `/app`, and admin at `/admin`. Run `vercel dev` to exercise the shared routing locally. Add the backend base URL to `apps/web/.env.local` as `NEXT_PUBLIC_API_URL` when it is provided; account forms are currently presentation and validation only, and do not send or save submitted details.
 
 ## Product notes
 

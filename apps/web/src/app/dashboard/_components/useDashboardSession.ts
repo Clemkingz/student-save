@@ -47,7 +47,8 @@ export function useDashboardSession() {
       } catch {
         studentVerified = false;
       }
-      const verificationExempt = pathname === "/dashboard/student-verification" || pathname === "/dashboard/settings";
+      const appPathname = pathname.replace(/^\/app(?=\/|$)/, "");
+      const verificationExempt = appPathname === "/dashboard/student-verification" || appPathname === "/dashboard/settings";
       if (!studentVerified && !verificationExempt) {
         router.replace(`/dashboard/student-verification?email=${encodeURIComponent(currentEmail)}`);
         return;

@@ -26,7 +26,7 @@ export function MockReceipt({ transaction, onClose }: { transaction: MockTransac
           <button type="button" onClick={onClose}>Done</button>
         </div>
         <div className={styles.receiptPaper}>
-          <Image className={styles.receiptLogo} src="/student-save-logo-dark.svg" alt="StudentSave" width={200} height={48} priority />
+          <Image className={styles.receiptLogo} src="/app/student-save-logo-dark.svg" alt="StudentSave" width={200} height={48} priority />
           <div className={styles.receiptStatus}><span aria-hidden="true">✓</span>{isIncome ? "Funds added successfully" : isWithdrawal ? "Withdrawal successful" : "Payment successful"}</div>
           <h2 id="receiptTitle">Transaction receipt</h2>
           <p className={styles.receiptNumber}>Receipt {transaction.receiptNumber || transaction.id}</p>

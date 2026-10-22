@@ -10,7 +10,7 @@ const upcomingAreas = [
 export default function WorkspaceHome() {
   return (
     <main className="workspace-shell">
-      <Image src="/student-save-logo.svg" width={205} height={51} alt="StudentSave — Save Smart, Spend Wisely" />
+      <Image src="/app/student-save-logo.svg" width={205} height={51} alt="StudentSave — Save Smart, Spend Wisely" />
       <section className="workspace-card">
         <span className="workspace-kicker">Your personal money space</span>
         <h1>Your next chapter<br /><span>starts here.</span></h1>

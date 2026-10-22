@@ -82,7 +82,7 @@ export function DashboardFrame({ email, active, children }: { email: string; act
     <div className={styles.appShell}>
       <aside className={styles.sidebar}>
         <Link className={styles.brand} href={dashboardHref}>
-          <Image src="/student-save-logo-dark.svg" width={250} height={58} alt="StudentSave" priority />
+          <Image src="/app/student-save-logo-dark.svg" width={250} height={58} alt="StudentSave" priority />
         </Link>
         <nav aria-label="Main navigation" className={styles.desktopNav}>
           {sidebarItems.map(({ label, href, Icon }) => <Link className={active === label ? styles.navActive : styles.navLink} href={href} key={label}><span className={styles.navIcon} aria-hidden="true"><Icon size={18} strokeWidth={2} /></span>{label}</Link>)}
@@ -91,7 +91,7 @@ export function DashboardFrame({ email, active, children }: { email: string; act
 
       <header className={styles.mobileHeader}>
         <Link className={styles.brand} href={dashboardHref}>
-          <Image src="/student-save-logo-dark.svg" width={250} height={58} alt="StudentSave" priority />
+          <Image src="/app/student-save-logo-dark.svg" width={250} height={58} alt="StudentSave" priority />
         </Link>
         <div className={styles.mobileAccountControls}><Link className={styles.mobileSettingsLink} href={settingsHref}>Account</Link>{active !== "Dashboard" && profilePictureLink(styles.mobileProfileAvatar)}</div>
       </header>

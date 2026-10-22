@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 
 const spendingBars = [42, 58, 46, 72, 52, 66, 86, 61, 75, 54, 96, 69];
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const appSignUpPath = "/app/auth/sign-up";
 
 const faqs = [
   {
@@ -122,14 +122,14 @@ export default function HomePage() {
             <Link href="#how-it-works">How it works</Link>
             <Link href="#faq">FAQs</Link>
           </nav>
-          <Link className="header-cta" href={`${appUrl}/auth/sign-up`}>Create account <ArrowRight size={16} aria-hidden="true" /></Link>
+          <Link className="header-cta" href={appSignUpPath}>Create account <ArrowRight size={16} aria-hidden="true" /></Link>
           <details className="mobile-menu">
             <summary aria-label="Open navigation"><Menu size={22} aria-hidden="true" /></summary>
             <nav aria-label="Mobile navigation">
               <Link href="#features">What you can do</Link>
               <Link href="#how-it-works">How it works</Link>
               <Link href="#faq">FAQs</Link>
-              <Link href={`${appUrl}/auth/sign-up`}>Create account</Link>
+              <Link href={appSignUpPath}>Create account</Link>
             </nav>
           </details>
         </div>
@@ -144,7 +144,7 @@ export default function HomePage() {
             <h1>Make room for<br />what <span>matters.</span></h1>
             <p className="hero-description">Student life has enough surprises. Keep your money in view, make a plan that feels doable, and build better habits one step at a time.</p>
             <div className="hero-buttons">
-              <Link className="button button-lime" href={`${appUrl}/auth/sign-up`}>Create account <ArrowRight size={17} aria-hidden="true" /></Link>
+              <Link className="button button-lime" href={appSignUpPath}>Create account <ArrowRight size={17} aria-hidden="true" /></Link>
               <Link className="button button-outline" href="#features">Explore the features</Link>
             </div>
             <div className="hero-trust"><ShieldCheck size={17} aria-hidden="true" /><span>Your money stays yours. StudentSave simply helps you keep track.</span></div>
@@ -243,7 +243,7 @@ export default function HomePage() {
           <span className="cta-kicker">Your next chapter starts with a small step</span>
           <h2>Make your money<br />make sense.</h2>
           <p>Keep track. Make a plan. Give your goals a little room to grow.</p>
-          <Link className="button button-lime" href={`${appUrl}/auth/sign-up`}>Create your account <ArrowRight size={17} aria-hidden="true" /></Link>
+          <Link className="button button-lime" href={appSignUpPath}>Create your account <ArrowRight size={17} aria-hidden="true" /></Link>
         </div>
       </section>
 
