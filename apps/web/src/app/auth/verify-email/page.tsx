@@ -36,6 +36,14 @@ function VerifyEmailContent() {
     setMockCode(initialCode);
   }, [storageKey]);
 
+  useEffect(() => {
+    if (!verified) return;
+    const timeout = window.setTimeout(() => {
+      router.replace(`/auth/wallet-setup?email=${encodeURIComponent(email)}`);
+    }, 1500);
+    return () => window.clearTimeout(timeout);
+  }, [email, router, verified]);
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNotice("");
@@ -71,7 +79,6 @@ function VerifyEmailContent() {
       }
     }
     setVerified(true);
-    setNotice("Email verified successfully on this device.");
   }
 
   function handleResend() {
@@ -123,23 +130,11 @@ function VerifyEmailContent() {
         Email verification confirms you own this address. It is not proof of student status.
       </p>
 
-      <button className={styles.secondaryButton} type="button" onClick={handleResend}>
-        Resend link
-      </button>
-
-      {verified && (
-        <button
-          className={`${styles.submitButton} ${styles.continueButton}`}
-          type="button"
-          onClick={() => router.push(`/auth/wallet-setup?email=${encodeURIComponent(email)}`)}
-        >
-          Continue
-        </button>
-      )}
+      {!verified && <button className={styles.secondaryButton} type="button" onClick={handleResend}>Resend link</button>}
 
       <p className={styles.mockCodeNotice}>Mock email code: <strong>{mockCode || "Loading…"}</strong></p>
-      {verified && <p className={styles.verificationSuccess} role="status">This email address is verified on this device.</p>}
-      {notice && <p className={verified ? styles.verificationSuccess : styles.formNotice} role="status">{notice}</p>}
+      {notice && <p className={styles.formNotice} role="status">{notice}</p>}
+      {verified && <div className={styles.verificationSuccessPopup} role="status" aria-live="polite"><span className={styles.verificationCheck} aria-hidden="true"><svg viewBox="0 0 32 32"><path d="m8 16 5.2 5.2L24 10.5" /></svg></span><strong>Email verified</strong><span>Taking you to wallet setup…</span></div>}
     </AuthFrame>
   );
 }
