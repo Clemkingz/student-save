@@ -29,20 +29,19 @@ pnpm dev
 
 The web app also serves the landing page at `/landing` and the mock verification queue at `/admin/student-verifications`, reusing the standalone apps' components. Use the review link on the student's verification page to review submissions on the **same origin**. Browser storage is isolated by origin: the standalone admin app on port 3003 cannot read submissions from port 3000. This is a local mock review flow, with no admin authentication or server verification; production verification requires an authenticated backend.
 
-The main deployment is https://student-saveus.vercel.app. `apps/web/vercel.json` builds the web app, which serves welcome, landing, auth, dashboard, and mock admin routes together. The old `/app` base path and multi-service rewrites have been removed.
+The main deployment is https://student-saveus.vercel.app. The root `vercel.json` declares one Next.js service from `apps/web`, which serves welcome, landing, auth, dashboard, and mock admin routes together. All public requests route to that service. The old `/app` base path has been removed.
 
 ### Vercel deployment
 
 In the Vercel project's Settings → Build and Deployment, configure:
 
-- Root Directory: `apps/web`.
-- Enable **Include source files outside of the Root Directory in the Build Step**. The web app imports shared packages and the landing and admin components from sibling directories.
-- Framework Preset: **Next.js**.
-- Build Command: `pnpm build` (provided by `apps/web/vercel.json`).
-- Output Directory: `.next` (provided by `apps/web/vercel.json`). Remove any old `apps/web/.next` override.
-- Install Command: leave the override disabled so Vercel detects pnpm and installs the workspace dependencies.
+- Root Directory: repository root (leave empty or use `.`).
+- Framework Preset: **Services**, matching the existing Vercel project.
+- Leave project-level build, install, and output overrides disabled. The root `vercel.json` configures `pnpm build` and `.next` inside the `web` service, whose root is `apps/web`. Vercel detects Next.js from that service's package.json and installs the pnpm workspace dependencies.
 
-Save these settings and deploy the commit containing this configuration. Building from the repository root causes `NEXT_NO_VERSION`: the root package is the workspace orchestrator, while Next.js is a dependency of `apps/web/package.json`.
+Deploy the commit containing the root service declaration. `MISSING_SERVICES` means the project is set to Services but its selected root has no `services` declaration. `NEXT_NO_VERSION` occurs if the repository root is treated directly as a Next.js app: Next.js is a dependency of `apps/web/package.json`, not the workspace root.
+
+For an independent, non-Services deployment, select `apps/web` as the project root, use the Next.js preset, and enable **Include source files outside of the Root Directory in the Build Step**. `apps/web/vercel.json` supports this alternative; do not combine its app root with the Services preset.
 
 Optional configuration:
 
