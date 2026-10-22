@@ -5,3 +5,4 @@ export default defineConfig([
   ...nextJsConfig,
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"])
 ]);
+// 
