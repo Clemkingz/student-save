@@ -1,6 +1,7 @@
 import type { MockTransaction } from "./mockFinance";
 
-export type Frequency = "daily" | "monthly";
+export type Frequency = "daily" | "weekly" | "monthly";
+export type ContributionMethod = "auto" | "manual" | "none";
 export type SavingsGoal = {
   id: string;
   name: string;
@@ -10,6 +11,12 @@ export type SavingsGoal = {
   frequency: Frequency;
   dueDate: string;
   createdAt: string;
+  // Optional only for records created before contribution settings were added.
+  contributionMethod?: ContributionMethod;
+  autoAmount?: number;
+  autoFrequency?: Frequency;
+  withdrawnAt?: string;
+  withdrawalAmount?: number;
   autoContribute?: boolean;
   nextContributionDate?: string;
   scheduleDay?: number;
@@ -37,7 +44,8 @@ export function nextContributionDate(
   anchorDay = Number(value.slice(8, 10)),
 ) {
   const date = new Date(`${value}T12:00:00`);
-  if (frequency === "daily") date.setDate(date.getDate() + 1);
+  if (frequency === "daily" || frequency === "weekly")
+    date.setDate(date.getDate() + (frequency === "weekly" ? 7 : 1));
   else {
     date.setDate(1);
     date.setMonth(date.getMonth() + 1);
@@ -51,18 +59,30 @@ export function nextContributionDate(
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+// Backfill old browser-local records without enabling a previously paused plan.
+export function normalizeSavingsGoal(goal: SavingsGoal): SavingsGoal {
+  if (goal.contributionMethod) return goal;
+  return {
+    ...goal,
+    contributionMethod: goal.autoContribute ? "auto" : "none",
+    ...(goal.autoContribute
+      ? { autoAmount: goal.contributionAmount, autoFrequency: goal.frequency }
+      : {}),
+  };
+}
+
 export function applyDueContributions(
   goals: SavingsGoal[],
   contributions: SavingsContribution[],
   transactions: MockTransaction[],
   today: string,
 ) {
-  const nextGoals = goals.map((goal) => ({ ...goal }));
+  const nextGoals = goals.map((goal) => ({ ...normalizeSavingsGoal(goal) }));
   const nextContributions = [...contributions];
   const nextTransactions = [...transactions];
   const transactionIds = new Set(transactions.map((item) => item.id));
   const blocked: string[] = [];
-  let changed = false;
+  let changed = goals.some((goal) => !goal.contributionMethod);
 
   // Older contributions were reserved only on the goals page. Put them in the
   // common ledger once so every page uses the same available balance.
@@ -89,6 +109,8 @@ export function applyDueContributions(
   let balance = walletCents(nextTransactions);
   for (const goal of nextGoals) {
     if (
+      goal.withdrawnAt ||
+      goal.contributionMethod !== "auto" ||
       !goal.autoContribute ||
       !Number.isFinite(goal.contributionAmount) ||
       cents(goal.contributionAmount) <= 0 ||

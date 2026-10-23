@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "eslint",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "tsc --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --outDir .test-build src/app/dashboard/_components/*.test.ts && node --test .test-build/*.test.js"
   },
   "dependencies": {
     "@repo/ui": "workspace:*",

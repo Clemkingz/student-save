@@ -1,6 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { GoalWithdrawalButton } from "./_components/GoalWithdrawalButton";
+import type { SavingsGoal as Goal } from "./_components/savingsAutomation";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { DashboardFrame } from "./_components/DashboardFrame";
@@ -11,7 +13,6 @@ import { useDashboardSession } from "./_components/useDashboardSession";
 import styles from "./dashboard.module.css";
 
 type Budget = { id: string; category: string; amount: number; month: string };
-type Goal = { id: string; name: string; targetAmount: number; savedAmount: number; dueDate?: string };
 
 function DashboardContent() {
   const { email, wallet, ready } = useDashboardSession();
@@ -61,6 +62,7 @@ function DashboardContent() {
   const monthExpenseTotal = monthExpenses.reduce((sum, transaction) => sum + transaction.amount, 0);
   const currentBudgets = budgets.filter((budget) => budget.month === month);
   const activeGoals = goals.filter((goal) => goal.targetAmount > 0 && goal.savedAmount < goal.targetAmount).slice(0, 3);
+  const dashboardGoals = goals.filter((goal) => !goal.withdrawnAt).slice(0, 3);
   const budgetRows = currentBudgets.slice(0, 3).map((budget) => {
     const spent = monthExpenses.filter((transaction) => transaction.category === budget.category).reduce((sum, transaction) => sum + transaction.amount, 0);
     return { ...budget, spent, percent: Math.min(100, budget.amount > 0 ? spent / budget.amount * 100 : 0) };
@@ -142,9 +144,9 @@ function DashboardContent() {
 
         <section className={`${styles.panel} ${styles.savingsPanel}`}>
           <div className={styles.dashboardPanelHeader}><div><h2>Savings goals</h2><p>{activeGoals.length ? `${activeGoals.length} active goal${activeGoals.length === 1 ? "" : "s"}` : goals.length ? "All goals completed" : "Make progress toward a goal"}</p></div><Link href={`/dashboard/savings-goals?email=${encodeURIComponent(email)}`}>View all</Link></div>
-          {activeGoals.length ? <div className={styles.dashboardMiniList}>{activeGoals.map((goal) => {
+          {dashboardGoals.length ? <div className={styles.dashboardMiniList}>{dashboardGoals.map((goal) => {
             const percent = Math.min(100, goal.savedAmount / goal.targetAmount * 100);
-            return <div className={styles.dashboardMiniProgress} key={goal.id}><div className={styles.budgetHeading}><strong>{goal.name}</strong><span>{Math.round(percent)}%</span></div><div className={styles.progressTrack} role="progressbar" aria-label={`${goal.name} savings goal progress`} aria-valuenow={Math.round(percent)} aria-valuemin={0} aria-valuemax={100}><div className={styles.progressBar} style={{ width: `${percent}%` }} /></div><small>{displayMoney(goal.savedAmount)} saved of {displayMoney(goal.targetAmount)}{goal.dueDate ? ` · due ${new Date(`${goal.dueDate}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</small></div>;
+            return <div className={styles.dashboardMiniProgress} key={goal.id}><div className={styles.budgetHeading}><strong><Link href={`/dashboard/savings-goals/${encodeURIComponent(goal.id)}?email=${encodeURIComponent(email)}`}>{goal.name}</Link></strong><span>{Math.round(percent)}%</span></div><div className={styles.progressTrack} role="progressbar" aria-label={`${goal.name} savings goal progress`} aria-valuenow={Math.round(percent)} aria-valuemin={0} aria-valuemax={100}><div className={styles.progressBar} style={{ width: `${percent}%` }} /></div><small>{displayMoney(goal.savedAmount)} saved of {displayMoney(goal.targetAmount)}{goal.dueDate ? ` · due ${new Date(`${goal.dueDate}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</small><GoalWithdrawalButton goal={goal} email={email} /></div>;
           })}</div> : <p className={styles.budgetRemaining}>Set a target and track your savings progress here.</p>}
         </section>
       </div>

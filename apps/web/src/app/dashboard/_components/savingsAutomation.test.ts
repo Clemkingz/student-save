@@ -18,6 +18,7 @@ const goal = (overrides: Partial<SavingsGoal> = {}): SavingsGoal => ({
   dueDate: "",
   createdAt: "2026-10-20",
   autoContribute: true,
+  contributionMethod: "auto",
   nextContributionDate: "2026-10-21",
   scheduleDay: 20,
   ...overrides,
@@ -137,4 +138,37 @@ test("sub-unit contributions use integer cents", () => {
   );
   assert.equal(result.balance, 0);
   assert.equal(result.goals[0]?.savedAmount, 0.03);
+});
+
+
+test("weekly schedules advance seven days across month and year boundaries", () => {
+  assert.equal(nextContributionDate("2026-10-28", "weekly"), "2026-11-04");
+  assert.equal(nextContributionDate("2026-12-28", "weekly"), "2027-01-04");
+  const result = applyDueContributions(
+    [goal({ frequency: "weekly", nextContributionDate: "2026-10-21" })],
+    [], funds(100), "2026-11-04",
+  );
+  assert.equal(result.goals[0]?.savedAmount, 90);
+  assert.equal(result.goals[0]?.nextContributionDate, "2026-11-11");
+});
+
+test("legacy goals migrate their contribution method once without starting paused schedules", () => {
+  const result = applyDueContributions(
+    [goal({ contributionMethod: undefined, autoContribute: false })],
+    [], funds(100), "2026-10-21",
+  );
+  assert.equal(result.changed, true);
+  assert.equal(result.goals[0]?.contributionMethod, "none");
+  assert.equal(result.transactions.length, 1);
+  assert.equal(applyDueContributions(result.goals, result.contributions, result.transactions, "2026-10-21").changed, false);
+});
+
+test("explicit manual/none methods and withdrawn goals never auto-debit", () => {
+  const result = applyDueContributions([
+    goal({ contributionMethod: "manual" }),
+    goal({ id: "none", contributionMethod: "none" }),
+    goal({ id: "withdrawn", withdrawnAt: "2026-10-20T12:00:00Z" }),
+  ], [], funds(100), "2026-10-25");
+  assert.equal(result.balance, 100);
+  assert.equal(result.contributions.length, 0);
 });

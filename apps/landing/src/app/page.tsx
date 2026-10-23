@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StudentSlogan } from "./StudentSlogan";
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import {
@@ -35,7 +36,7 @@ const faqs = [
   },
   {
     question: "Do I need to be a student to use it?",
-    answer: "StudentSave is designed with student life in mind. Email verification confirms access to an email address; it does not verify student status.",
+    answer: "Yes. Student Save is built for students, so you'll need to complete student verification to access the app and its features.",
   },
   {
     question: "Can I change my budget or savings goal?",
@@ -154,6 +155,8 @@ export default function HomePage() {
         </div>
       </section>
 
+      <StudentSlogan signUpPath={appSignUpPath} />
+
       <section className="intro-strip" aria-label="StudentSave principles">
         <div className="intro-item"><span className="intro-mark"><Wallet size={17} aria-hidden="true" /></span><span>Know what you’ve recorded</span></div>
         <span className="intro-divider" />
@@ -252,7 +255,7 @@ export default function HomePage() {
         <div className="footer-main section-shell">
           <div className="footer-brand-block"><Brand footer /><p>Save smart. Spend wisely.<br />A little more clarity for student money.</p></div>
           <div className="footer-links"><strong>Explore</strong><Link href="#features">Features</Link><Link href="#how-it-works">How it works</Link><Link href="#faq">FAQs</Link></div>
-          <div className="footer-links"><strong>Our promise</strong><span>Manual tracking</span><span>Your money stays yours</span><span>No student-status claims</span></div>
+          <div className="footer-links"><strong>Our promise</strong><span>Manual tracking</span><span>Your money stays yours</span><span>Student verification required</span></div>
           <div className="footer-note"><span className="footer-note-icon"><ShieldCheck size={17} aria-hidden="true" /></span><p>StudentSave records information you enter. It does not connect to your bank or hold, transfer, or verify funds.</p></div>
         </div>
         <div className="footer-bottom section-shell"><span>© 2026 StudentSave</span><span>Built for better money habits.</span></div>

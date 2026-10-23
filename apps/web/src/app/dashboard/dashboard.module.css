@@ -595,3 +595,39 @@
 .scheduleAuthorization p { flex-basis: 100%; }
 .scheduleAuthorization label { color: #536177; font-size: 13px; }
 .scheduleAuthorization input { width: 130px; max-width: 100%; min-height: 44px; padding: 10px; border: 1px solid #cbd8d1; border-radius: 9px; font: inherit; }
+
+/* Native dialogs share the existing payment surface and keep background focus inert. */
+.goalDialog { margin: auto; max-width: calc(100% - 32px); animation: goalDialogEnter .22s ease-out both; }
+.goalDialog:not([open]) { display: none; }
+.goalDialog::backdrop { background: #11182799; animation: goalBackdropEnter .22s ease-out both; }
+.goalDialog .goalForm { margin-bottom: 0; }
+.contributionChoices { display: grid; gap: 12px; margin: 0; padding: 0; border: 0; }
+.contributionChoices legend { margin-bottom: 10px; color: var(--neutral-400); font-size: 13px; }
+.contributionChoice { display: flex; align-items: center; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+.contributionChoiceSelected { border-color: var(--primary); background: var(--primary-100); }
+.contributionChoice:focus-within { outline: 3px solid var(--ring); outline-offset: 3px; }
+.contributionChoice input { flex: 0 0 auto; accent-color: var(--primary); }
+.contributionChoice > svg { flex: 0 0 auto; color: var(--primary-700); }
+.contributionChoice strong, .contributionChoice small { display: block; }
+.contributionChoice strong { font-size: 14px; }
+.contributionChoice small { margin-top: 5px; color: var(--neutral-400); font-size: 12px; line-height: 1.5; }
+.goalCardActions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 14px; }
+.withdrawalControl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.goalReached { color: var(--success-700); font-size: 13px; font-weight: 700; }
+.withdrawReady { border-color: var(--primary-700); box-shadow: 0 0 0 3px var(--primary-100); }
+.withdrawTooltip { position: relative; display: inline-flex; }
+.withdrawTooltipText { position: absolute; z-index: 5; left: 0; bottom: calc(100% + 8px); width: 220px; padding: 9px 12px; border-radius: 9px; color: var(--white); background: var(--neutral-700); font-size: 12px; line-height: 1.5; pointer-events: none; opacity: 0; transition: opacity .15s ease; }
+.withdrawTooltip:hover .withdrawTooltipText, .withdrawTooltip:focus .withdrawTooltipText { opacity: 1; }
+.goalCardActions button:disabled, .goalDialog button:disabled { opacity: .55; cursor: not-allowed; }
+@keyframes goalDialogEnter { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes goalBackdropEnter { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 540px) {
+  .goalCardActions, .withdrawalControl { align-items: stretch; flex-direction: column; }
+  .withdrawTooltip, .withdrawTooltip > button { width: 100%; }
+  .goalHeading { flex-wrap: wrap; }
+  .goalDialog .goalFormGrid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .goalDialog, .goalDialog::backdrop { animation: none; }
+  .withdrawTooltipText { transition: none; }
+}

@@ -354,3 +354,32 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.student-slogan { position: relative; overflow: hidden; padding: 64px 0; color: var(--white); background: var(--primary-800); }
+.slogan-content { position: relative; z-index: 1; text-align: center; }
+.slogan-content h2 { margin: 0 auto; max-width: 950px; font-size: clamp(30px, 6vw, 56px); line-height: 1.14; letter-spacing: -.045em; }
+.slogan-line { display: block; }
+.slogan-accent { width: fit-content; margin: 12px auto 0; color: var(--brand-lime); }
+.slogan-accent::after { display: block; height: 3px; margin-top: 8px; border-radius: 3px; background: currentColor; content: ""; transform-origin: left; }
+.slogan-content > p { max-width: 650px; margin: 24px auto; color: var(--primary-100); font-size: 15px; line-height: 1.8; }
+.slogan-icons { position: absolute; inset: 0; pointer-events: none; }
+.slogan-icons svg { position: absolute; width: 48px; height: 48px; color: var(--brand-lime); opacity: .14; }
+.slogan-icons svg:nth-child(1) { left: 4%; top: 16%; }
+.slogan-icons svg:nth-child(2) { right: 5%; top: 48%; }
+.slogan-icons svg:nth-child(3) { left: 12%; bottom: 8%; }
+.student-slogan[data-reveal="pending"] .slogan-line { opacity: 0; transform: translateY(18px); }
+.student-slogan[data-reveal="visible"] .slogan-line { animation: slogan-reveal .65s ease both; }
+.student-slogan[data-reveal="visible"] .slogan-line:nth-child(2) { animation-delay: .18s; }
+.student-slogan[data-reveal="visible"] .slogan-line:nth-child(3) { animation-delay: .36s; }
+.student-slogan[data-reveal="visible"] .slogan-accent::after { animation: slogan-underline .8s .65s ease both; }
+.student-slogan[data-reveal="visible"] .slogan-icons svg { animation: slogan-drift 12s ease-in-out infinite; }
+.student-slogan[data-reveal="visible"] .slogan-icons svg:nth-child(2) { animation-delay: -4s; }
+.student-slogan[data-reveal="visible"] .slogan-icons svg:nth-child(3) { animation-delay: -8s; }
+@keyframes slogan-reveal { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slogan-underline { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes slogan-drift { 0%, 100% { transform: translate(0, 0) rotate(-8deg); } 50% { transform: translate(10px, -16px) rotate(8deg); } }
+@media (min-width: 700px) { .student-slogan { padding-block: 88px; } .slogan-icons svg { width: 70px; height: 70px; } }
+@media (prefers-reduced-motion: reduce) {
+  .student-slogan .slogan-line, .student-slogan .slogan-accent::after, .student-slogan .slogan-icons svg { animation: none !important; transform: none !important; }
+  .student-slogan[data-reveal] .slogan-line { opacity: 1; }
+}
