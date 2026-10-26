@@ -1,5 +1,7 @@
 "use client";
 
+import { isSuccessfulCredit } from "./mockFinance";
+
 import Image from "next/image";
 import type { MockTransaction } from "./mockFinance";
 import styles from "./mockReceipt.module.css";
@@ -30,7 +32,7 @@ export function MockReceipt({ transaction, onClose }: { transaction: MockTransac
           <div className={styles.receiptStatus}><span aria-hidden="true">✓</span>{isIncome ? "Funds added successfully" : isWithdrawal ? "Withdrawal successful" : "Payment successful"}</div>
           <h2 id="receiptTitle">Transaction receipt</h2>
           <p className={styles.receiptNumber}>Receipt {transaction.receiptNumber || transaction.id}</p>
-          <strong className={styles.receiptAmount}>{isIncome ? "+" : "−"}₦{transaction.amount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+          <strong className={`${styles.receiptAmount} ${isSuccessfulCredit(transaction) ? "funds-added-amount" : ""}`}>{isIncome ? "+" : "−"}₦{transaction.amount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
           <dl className={styles.receiptDetails}>
             <div><dt>{isIncome ? "Source" : "Recipient"}</dt><dd>{isIncome ? transaction.category : transaction.recipientName || "—"}</dd></div>
             <div><dt>Bank</dt><dd>{transaction.recipientBank || "—"}</dd></div>

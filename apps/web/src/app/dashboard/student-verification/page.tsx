@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { useDashboardSession } from "../_components/useDashboardSession";
+import { UniversitySelect } from "../_components/UniversitySelect";
 import styles from "../dashboard.module.css";
 
 type StudentDetails = {
@@ -126,6 +127,7 @@ function StudentVerificationContent() {
 
   function submitDetails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!institution.trim()) { setError("Choose your university or enter your institution using Other."); return; }
     if (!schoolIdImage) {
       setError("Upload a clear image of your school ID card.");
       setNotice("");
@@ -206,7 +208,7 @@ function StudentVerificationContent() {
         <form className={`${styles.panel} ${styles.studentVerificationForm}`} onSubmit={submitDetails}>
           <h2>Upload student details</h2>
           <div className={styles.studentVerificationFields}>
-            <div className={styles.transactionField}><label htmlFor="institution">Name of institution</label><input id="institution" value={institution} onChange={(event) => setInstitution(event.target.value)} placeholder="e.g. University of Lagos" required /></div>
+            <UniversitySelect key={ready ? "ready" : "loading"} value={institution} onChange={setInstitution} />
             <div className={styles.transactionField}><label htmlFor="matricNumber">Matriculation number</label><input id="matricNumber" value={matricNumber} onChange={(event) => setMatricNumber(event.target.value)} placeholder="Enter your matric number" required /></div>
             <div className={styles.transactionField}><label htmlFor="level">Level</label><select id="level" value={level} onChange={(event) => setLevel(event.target.value)} required><option value="" disabled>Select your level</option>{["100", "200", "300", "400", "500", "600", "700", "Postgraduate", "Other"].map((option) => <option key={option} value={option}>{option === "Postgraduate" || option === "Other" ? option : `${option} level`}</option>)}</select></div>
             <div className={styles.transactionField}><label htmlFor="course">Course of study</label><input id="course" value={course} onChange={(event) => setCourse(event.target.value)} placeholder="e.g. Computer Science" required /></div>

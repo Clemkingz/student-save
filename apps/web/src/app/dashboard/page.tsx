@@ -1,5 +1,7 @@
 "use client";
 
+import { isSuccessfulCredit } from "./_components/mockFinance";
+
 import { Suspense, useEffect, useState } from "react";
 import { GoalWithdrawalButton } from "./_components/GoalWithdrawalButton";
 import type { SavingsGoal as Goal } from "./_components/savingsAutomation";
@@ -105,7 +107,7 @@ function DashboardContent() {
         </article>
         <article className={styles.statCard}>
           <p>Income this month</p>
-          <strong>{displayMoney(monthIncomeTotal)}</strong>
+          <strong className={monthIncomeTotal > 0 && monthIncome.every(isSuccessfulCredit) ? "funds-added-amount" : undefined}>{monthIncomeTotal > 0 ? "+" : ""}{displayMoney(monthIncomeTotal)}</strong>
           <small>{monthIncome.length} {monthIncome.length === 1 ? "record" : "records"}</small>
         </article>
         <article className={styles.statCard}>
@@ -123,7 +125,7 @@ function DashboardContent() {
       <div className={styles.contentGrid}>
         <section className={`${styles.panel} ${styles.dashboardChart}`}>
           <h2>Funds and expenses · last 6 months</h2>
-          <MoneyFlowChart points={chartMonths.map((item) => ({ label: item.label, income: item.income, expense: item.expenses }))} ariaLabel="Monthly funds added and expenses for the last six months" showValues={showBalances} />
+          <MoneyFlowChart highlightIncome={transactions.filter(item => item.type === "income").every(isSuccessfulCredit)} points={chartMonths.map((item) => ({ label: item.label, income: item.income, expense: item.expenses }))} ariaLabel="Monthly funds added and expenses for the last six months" showValues={showBalances} />
         </section>
         <section className={styles.panel}>
           <h2>Recent activity</h2>
@@ -131,7 +133,7 @@ function DashboardContent() {
             {recentTransactions.map((transaction) => (
               <li className={styles.activityItem} key={transaction.id}>
                 <div><strong>{transaction.category}</strong><span>{transaction.type === "income" ? "Funds added" : transaction.category === "Withdrawal" ? "Withdrawal" : "Expense"} · {new Date(`${transaction.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span></div>
-                <b className={transaction.type === "income" ? styles.positive : undefined}>{transaction.type === "income" ? "+" : "−"}{displayMoney(transaction.amount)}</b>
+                <b className={isSuccessfulCredit(transaction) ? "funds-added-amount" : undefined}>{transaction.type === "income" ? "+" : "−"}{displayMoney(transaction.amount)}</b>
               </li>
             ))}
           </ul> : <p className={styles.budgetRemaining}>Your recent funds and expenses will appear here.</p>}

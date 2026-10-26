@@ -383,3 +383,35 @@
   .student-slogan .slogan-line, .student-slogan .slogan-accent::after, .student-slogan .slogan-icons svg { animation: none !important; transform: none !important; }
   .student-slogan[data-reveal] .slogan-line { opacity: 1; }
 }
+
+/* One continuous brand canvas across the marketing page. */
+:root {
+  --landing-canvas: #f4fbf8;
+  --landing-wash: var(--brand-mint);
+  --landing-deep: var(--primary-800);
+  --landing-shadow: 0 14px 40px color-mix(in srgb, var(--brand-forest) 10%, transparent);
+  --landing-ease: cubic-bezier(.2,.7,.2,1);
+}
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+.landing-page { background: var(--landing-canvas); }
+.landing-page .site-header { background: var(--landing-deep); }
+.landing-page .desktop-nav a { color: var(--brand-mint); }
+.landing-page .hero-section { background: linear-gradient(180deg, var(--landing-deep), var(--brand-forest)); }
+.landing-page .student-slogan { background: linear-gradient(180deg, var(--brand-forest), var(--primary-700)); }
+.landing-page .intro-strip { width: 100%; background: linear-gradient(180deg, var(--primary-700), var(--landing-canvas) 75%); border: 0; padding-block: 75px 32px; color: var(--primary-900); }
+.landing-page .how-section, .landing-page .faq-section, .landing-page .site-footer { background: transparent; }
+.landing-page .feature-card-yellow { background: color-mix(in srgb, var(--brand-lime) 18%, var(--landing-canvas)); }
+.landing-page .feature-card-mint, .landing-page .feature-card-green { background: color-mix(in srgb, var(--brand-mint) 65%, white); }
+.landing-page .final-cta-card { background: linear-gradient(135deg, var(--brand-forest), var(--landing-deep)); box-shadow: var(--landing-shadow); }
+.landing-page a, .landing-page button, .landing-page .feature-card { transition-duration: 250ms; transition-timing-function: var(--landing-ease); }
+.landing-page a:focus-visible, .landing-page summary:focus-visible { outline: 3px solid var(--brand-lime); outline-offset: 4px; }
+.landing-page .feature-card:hover { transform: translateY(-3px); box-shadow: var(--landing-shadow); }
+.landing-page .mobile-menu summary { color: var(--brand-mint); min-width: 44px; min-height: 44px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .landing-page *, .landing-page *::before, .landing-page *::after { animation: none !important; transition: none !important; }
+}
+
+.landing-page .site-header .brand img { filter: brightness(0) invert(1); }
+.landing-page .feature-icon { background: var(--primary-100); color: var(--primary-700); }
+.landing-page .how-section { background: radial-gradient(ellipse at center, var(--landing-wash), transparent 70%); }

@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { MockReceipt } from "../_components/MockReceipt";
 import { MoneyFlowChart } from "../_components/MoneyFlowChart";
-import { getMockTransactions, type MockTransaction } from "../_components/mockFinance";
+import { isSuccessfulCredit, getMockTransactions, type MockTransaction } from "../_components/mockFinance";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
 
@@ -164,7 +164,7 @@ function ReportsContent() {
     const receiptAlerts = transactions.filter((transaction) => transaction.receiptNumber && transaction.date >= bounds.start && transaction.date <= bounds.end).map((transaction) => ({
       id: `receipt-${transaction.id}`,
       title: transaction.type === "income" ? "Funds added receipt ready" : transaction.category === "Withdrawal" ? "Withdrawal receipt ready" : "Payment receipt ready",
-      detail: `${money(transaction.amount)} · ${transaction.receiptNumber} · ${dateLabel(transaction.date)}`,
+      detail: `${transaction.receiptNumber} · ${dateLabel(transaction.date)}`,
       receipt: transaction,
     }));
     return [...receiptAlerts, ...budgetAlerts, ...goalAlerts, ...lockAlerts].filter((item) => !dismissed.includes(item.id));
@@ -193,7 +193,7 @@ function ReportsContent() {
       </div>
 
       <section className={styles.reportStats} aria-label="Activity totals for selected period">
-        <article className={`${styles.statCard} ${styles.balanceCard}`}><p>Funds added</p><strong>{money(income)}</strong><small>{activities.filter((item) => item.kind === "Funds added").length} records</small></article>
+        <article className={`${styles.statCard} ${styles.balanceCard}`}><p>Funds added</p><strong className={income > 0 && activities.filter(item => item.kind === "Funds added").every(item => item.transaction && isSuccessfulCredit(item.transaction)) ? "funds-added-amount" : undefined}>{income > 0 ? "+" : ""}{money(income)}</strong><small>{activities.filter((item) => item.kind === "Funds added").length} records</small></article>
         <article className={styles.statCard}><p>Expenses &amp; locks</p><strong>{money(expenses)}</strong><small>Includes wallet deductions</small></article>
         <article className={styles.statCard}><p>Net recorded</p><strong>{money(income - expenses)}</strong><small>{activities.length} activities tracked</small></article>
       </section>
@@ -204,7 +204,7 @@ function ReportsContent() {
         <section className={`${styles.panel} ${styles.reportChartPanel}`}>
           <h2>Funds and expenses over time</h2>
           <p className={styles.budgetRemaining}>{bounds.start.slice(0, 7) === bounds.end.slice(0, 7) ? "Weekly totals for the selected month." : "Monthly totals for the selected date range."} Use the filters above to compare a different period.</p>
-          <MoneyFlowChart points={moneyFlow} ariaLabel="Monthly funds added and expenses for the selected report period" />
+          <MoneyFlowChart highlightIncome={transactions.filter(item => item.type === "income").every(isSuccessfulCredit)} points={moneyFlow} ariaLabel="Monthly funds added and expenses for the selected report period" />
           {moneyFlow.length > 0 && <ul className={styles.reportFlowDetails}>{moneyFlow.map((item) => <li key={`detail-${item.label}`}><span>{item.label}</span><span>Funds {money(item.income)}</span><span>Expenses {money(item.expense)}</span><strong>Net {money(item.income - item.expense)}</strong></li>)}</ul>}
         </section>
         <section className={styles.panel}>
@@ -217,12 +217,12 @@ function ReportsContent() {
 
         <section className={styles.panel}>
           <h2>Alerts</h2>
-          {alerts.length ? <ul className={styles.reportAlerts}>{alerts.map((alert) => <li key={alert.id}><div><strong>{alert.title}</strong><span>{alert.detail}</span></div>{alert.receipt ? <button type="button" onClick={() => setReceiptTransaction(alert.receipt || null)}>View receipt</button> : <button type="button" onClick={() => dismissAlert(alert.id)}>Dismiss</button>}</li>)}</ul> : <p className={styles.emptyTransactions}>You’re all caught up. Budget, savings, and receipt alerts will appear here.</p>}
+          {alerts.length ? <ul className={styles.reportAlerts}>{alerts.map((alert) => <li key={alert.id}><div><strong>{alert.title}</strong><span>{alert.receipt && <><b className={isSuccessfulCredit(alert.receipt) ? "funds-added-amount" : undefined}>{alert.receipt.type === "income" ? "+" : "−"}{money(alert.receipt.amount)}</b> · </>}{alert.detail}</span></div>{alert.receipt ? <button type="button" onClick={() => setReceiptTransaction(alert.receipt || null)}>View receipt</button> : <button type="button" onClick={() => dismissAlert(alert.id)}>Dismiss</button>}</li>)}</ul> : <p className={styles.emptyTransactions}>You’re all caught up. Budget, savings, and receipt alerts will appear here.</p>}
         </section>
 
         <section className={`${styles.panel} ${styles.reportActivityPanel}`}>
           <h2>Activity history</h2>
-          {activities.length ? <ul className={styles.reportActivityList}>{activities.map((item) => <li key={item.id}><div><strong>{item.title}</strong><span>{item.kind} · {dateLabel(item.date)}{item.detail ? ` · ${item.detail}` : ""}{item.transaction?.receiptNumber ? ` · Receipt ${item.transaction.receiptNumber}` : ""}</span></div>{item.transaction?.receiptNumber && <button className={styles.reportReceiptButton} type="button" onClick={() => setReceiptTransaction(item.transaction || null)}>Receipt</button>}<b>{item.kind === "Funds added" ? "+" : "−"}{money(item.amount)}</b></li>)}</ul> : <p className={styles.emptyTransactions}>No activity recorded in this date range.</p>}
+          {activities.length ? <ul className={styles.reportActivityList}>{activities.map((item) => <li key={item.id}><div><strong>{item.title}</strong><span>{item.kind} · {dateLabel(item.date)}{item.detail ? ` · ${item.detail}` : ""}{item.transaction?.receiptNumber ? ` · Receipt ${item.transaction.receiptNumber}` : ""}</span></div>{item.transaction?.receiptNumber && <button className={styles.reportReceiptButton} type="button" onClick={() => setReceiptTransaction(item.transaction || null)}>Receipt</button>}<b className={item.transaction && isSuccessfulCredit(item.transaction) ? "funds-added-amount" : undefined}>{item.kind === "Funds added" ? "+" : "−"}{money(item.amount)}</b></li>)}</ul> : <p className={styles.emptyTransactions}>No activity recorded in this date range.</p>}
         </section>
       </div>
       <p className={styles.disclaimer}>Reports use your saved mock transactions, budgets, savings goals, contributions, and lock commitments on this device.</p>

@@ -163,3 +163,8 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+/* Amount-only success ink: AA on white and pale surfaces. */
+:root { --funds-added-ink: var(--success-700); }
+[data-theme="dark"] { --funds-added-ink: var(--success-300); }
+.funds-added-amount { color: var(--funds-added-ink) !important; }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState, type FormEvent } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { saveFinance, withFinanceLock } from "../_components/financeStorage";
@@ -19,6 +19,8 @@ function money(amount: number) {
 function AddFundsContent() {
   const { email, wallet, ready } = useDashboardSession();
   const [transactions, setTransactions] = useState<MockTransaction[]>([]);
+  const busy = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
   const [amount, setAmount] = useState("");
   const [source, setSource] = useState(fundSources[0] ?? "Other");
   const [note, setNote] = useState("");
@@ -44,12 +46,14 @@ function AddFundsContent() {
 
   async function recordFunds(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy.current) return;
     const numericAmount = Number(amount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       setError("Enter an amount greater than zero.");
       setNotice("");
       return;
     }
+    busy.current = true; setSubmitting(true);
     try { await withFinanceLock(email, () => {
     const transaction: MockTransaction = {
       id: crypto.randomUUID(),
@@ -71,6 +75,7 @@ function AddFundsContent() {
     setSuccessfulTransaction(transaction);
     setSuccessToast({ id: crypto.randomUUID(), message: "Funds added successfully!" });
     }); } catch { setError("Funds could not be saved. Check browser storage and try again."); }
+    finally { busy.current = false; setSubmitting(false); }
   }
 
   async function copyAccountNumber() {
@@ -121,7 +126,7 @@ function AddFundsContent() {
           </div>
           {error && <p className={styles.goalError} role="alert">{error}</p>}
           {notice && <p className={styles.transactionSaved} role="status">{notice}</p>}
-          <button className={styles.primaryAction} type="submit">Add funds manually</button>
+          <button className={styles.primaryAction} type="submit" disabled={submitting || !Number.isFinite(Number(amount)) || Number(amount) < .01}>{submitting ? "Adding funds…" : "Add funds manually"}</button>
           <p className={styles.transactionFootnote}>This is a mock record for testing. It does not move real money.</p>
         </form>
 
@@ -153,7 +158,7 @@ function AddFundsContent() {
       </div>}
 
       {successfulTransaction && <MockReceipt transaction={successfulTransaction} onClose={() => setSuccessfulTransaction(null)} />}
-      {successToast && <TransactionSuccessPopup key={successToast.id} message={successToast.message} />}
+      {successToast && <TransactionSuccessPopup key={successToast.id} message={successToast.message}>{successfulTransaction && <strong className="funds-added-amount">+{money(successfulTransaction.amount)}</strong>}</TransactionSuccessPopup>}
     </DashboardFrame>
   );
 }

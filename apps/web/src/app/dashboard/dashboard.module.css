@@ -107,7 +107,7 @@
 .activityItem strong { display: block; color: #202b3d; font-size: 15px; font-weight: 600; }
 .activityItem span { display: block; margin-top: 3px; color: #758198; font-size: 13px; }
 .activityItem b { color: #202b3d; font-size: 15px; white-space: nowrap; }
-.activityItem .positive { color: #159050; }
+.activityItem .positive { color: var(--funds-added-ink); }
 .budgetList { display: grid; gap: 17px; }
 .budgetHeading { display: flex; justify-content: space-between; gap: 10px; color: #202b3d; font-size: 14px; }
 .budgetHeading span:last-child { color: #758198; white-space: nowrap; }
@@ -631,3 +631,28 @@
   .goalDialog, .goalDialog::backdrop { animation: none; }
   .withdrawTooltipText { transition: none; }
 }
+
+.toast { position: fixed; z-index: 1300; top: max(16px, env(safe-area-inset-top)); left: 50%; display: flex; align-items: center; gap: 12px; width: min(420px, calc(100vw - 24px)); padding: 12px 16px; border: 1px solid var(--border); border-radius: 16px; color: var(--foreground); background: var(--white); box-shadow: 0 12px 36px #052b2926; transform: translateX(-50%); animation: toastEnter .25s ease-out both; }
+.toast > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.toast button { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border: 0; border-radius: 8px; color: inherit; background: transparent; cursor: pointer; }
+.toast[data-tone="success"] { color: var(--success-800); background: var(--success-50); border-color: var(--success-200); }
+.toast[data-tone="error"] { color: var(--danger-700); background: var(--danger-50); }
+.toastClosing { animation: toastExit .25s ease-in both; }
+@keyframes toastEnter { from { opacity: 0; transform: translate(-50%, -130%); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes toastExit { to { opacity: 0; transform: translate(-50%, -130%); } }
+@media (prefers-reduced-motion: reduce) { .toast, .toastClosing { animation-duration: .01ms; } }
+.manualContributionGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.manualContribution { display: grid; align-content: start; gap: 16px; min-width: 0; }
+.manualContribution h3, .manualContribution p { overflow-wrap: anywhere; margin: 0; }
+.manualContribution input, .manualContribution button { min-height: 44px; min-width: 0; max-width: 100%; width: 100%; }
+.manualContribution .transactionField { min-width: 0; }
+.universityPicker { position: relative; }
+.universityOptions { position: absolute; z-index: 20; top: 76px; left: 0; right: 0; max-height: min(320px, 45vh); overflow-y: auto; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--border); border-radius: 12px; background: var(--white); box-shadow: 0 12px 32px #052b2926; }
+.universityOptions li { display: grid; gap: 3px; min-height: 44px; padding: 10px; border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; }
+.universityOptions li strong { font-size: 14px; }
+.universityOptions li small { color: var(--neutral-400); }
+.universityOptions li:hover, .universityOptions li[data-active="true"] { background: var(--primary-100); }
+.manualContribution .secretToggle { width: 44px; height: 44px; right: 2px; }
+.manualContribution .secretInputWrap input { padding-right: 50px; }
+/* The existing teal report card needs pale green amount ink for AA contrast. */
+.reportStats > .balanceCard { --funds-added-ink: var(--success-50); }

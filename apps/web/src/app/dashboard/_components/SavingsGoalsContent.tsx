@@ -2,17 +2,14 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Eye, EyeOff } from "lucide-react";
+import { ManualContribution } from "./ManualContribution";
 import { DashboardFrame } from "./DashboardFrame";
-import { TransactionSuccessPopup } from "./TransactionSuccessPopup";
 import { getMockTransactions } from "./mockFinance";
-import { verifyTransactionPin } from "./transactionPin";
 import { useDashboardSession } from "./useDashboardSession";
 import styles from "../dashboard.module.css";
 
-import { cents, walletCents, normalizeSavingsGoal, type SavingsGoal as Goal, type SavingsContribution as Contribution } from "./savingsAutomation";
+import { cents, walletCents, normalizeSavingsGoal, type SavingsGoal as Goal } from "./savingsAutomation";
 import { readFinanceList, saveFinance, withFinanceLock } from "./financeStorage";
-import { localDateValue, type MockTransaction } from "./mockFinance";
 
 import { ContributionSettingsDialog } from "./ContributionSettingsDialog";
 import { GoalWithdrawalButton } from "./GoalWithdrawalButton";
@@ -26,7 +23,6 @@ function money(amount: number) {
 export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
   const { email, ready } = useDashboardSession();
   const goalsKey = `studentsave:savings-goals:${email}`;
-  const contributionsKey = `studentsave:savings-contributions:${email}`;
   const [goals, setGoals] = useState<Goal[]>([]);
   const [settingsGoal, setSettingsGoal] = useState<Goal | null>(null);
   const [saving, setSaving] = useState(false);
@@ -36,13 +32,8 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
   const [customName, setCustomName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [selectedGoalId, setSelectedGoalId] = useState("");
-  const [contributionAmount, setContributionAmount] = useState("");
-  const [contributionPin, setContributionPin] = useState("");
-  const [showContributionPin, setShowContributionPin] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [successToast, setSuccessToast] = useState<{ id: string; message: string } | null>(null);
 
   useEffect(() => {
     if (!ready || !email) return;
@@ -63,7 +54,6 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
     setMode(nextMode);
     setError("");
     setNotice("");
-    if (nextMode === "contribution") setSelectedGoalId(goalId && availableGoals.some((goal) => goal.id === goalId) ? goalId : availableGoals[0]?.id ?? "");
   }
 
   async function saveGoal(event: FormEvent<HTMLFormElement>) {
@@ -88,7 +78,6 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
           createdAt: new Date().toISOString(), contributionMethod: "none", autoContribute: false,
         };
         saveFinance(email, { [goalsKey]: [goal, ...readFinanceList<Goal>(goalsKey)] });
-        setSelectedGoalId(goal.id);
         setSettingsGoal(goal);
       });
       setTargetAmount(""); setCustomName(""); setDueDate("");
@@ -106,37 +95,6 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
       });
       setNotice("Automatic contributions paused."); setError("");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not pause contributions."); }
-    finally { setSaving(false); }
-  }
-
-  async function saveContribution(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const amount = Number(contributionAmount);
-    if (!Number.isFinite(amount) || cents(amount) <= 0) { setError("Enter a contribution of at least ₦0.01."); return; }
-    setSaving(true);
-    try {
-      await withFinanceLock(email, async () => {
-        if (!(await verifyTransactionPin(email, contributionPin))) throw new Error("Enter your correct 4-digit transaction PIN.");
-        const transactions = getMockTransactions(email);
-        const currentGoals = readFinanceList<Goal>(goalsKey);
-        const goal = currentGoals.find(item => item.id === selectedGoalId);
-        if (!goal) throw new Error("Choose a savings goal.");
-        if (goal.withdrawnAt) throw new Error("This goal has already been withdrawn.");
-        if (cents(amount) > walletCents(transactions)) throw new Error("Your balance is too low. Add funds before contributing.");
-        if (cents(amount) > cents(goal.targetAmount) - cents(goal.savedAmount)) throw new Error(`This goal needs only ${money((cents(goal.targetAmount) - cents(goal.savedAmount)) / 100)} more.`);
-        const id = crypto.randomUUID();
-        const contribution: Contribution = { id, transactionId: id, goalId: goal.id, amount: cents(amount) / 100, frequency: goal.frequency, date: localDateValue(), createdAt: new Date().toISOString() };
-        const transaction: MockTransaction = { id, type: "expense", amount: contribution.amount, category: "Savings contribution", date: localDateValue(), note: `Contribution to ${goal.name}` };
-        saveFinance(email, {
-          [contributionsKey]: [contribution, ...readFinanceList<Contribution>(contributionsKey)],
-          [goalsKey]: currentGoals.map(item => item.id === goal.id ? { ...item, savedAmount: (cents(item.savedAmount) + cents(amount)) / 100 } : item),
-          [`studentsave:transactions:${email}`]: [transaction, ...transactions],
-        });
-        setNotice(`${money(contribution.amount)} added to ${goal.name}.`);
-      });
-      setContributionAmount(""); setContributionPin(""); setError(""); setMode(null);
-      setSuccessToast({ id: crypto.randomUUID(), message: "Savings contribution successful!" });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save this contribution."); }
     finally { setSaving(false); }
   }
 
@@ -195,30 +153,9 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
         </form>
       )}
 
-      {mode === "contribution" && (
-        <form className={`${styles.panel} ${styles.goalForm}`} onSubmit={saveContribution} noValidate>
-          <h2>Make a one-time contribution</h2>
-          <div className={styles.goalFormGrid}>
-            <div className={styles.transactionField}>
-              <label htmlFor="contributionGoal">Savings goal</label>
-              <select id="contributionGoal" value={selectedGoalId} onChange={(event) => setSelectedGoalId(event.target.value)}>
-                {availableGoals.map((goal) => <option key={goal.id} value={goal.id}>{goal.name} · {money(goal.targetAmount - goal.savedAmount)} remaining</option>)}
-              </select>
-            </div>
-            <div className={styles.transactionField}>
-              <label htmlFor="contributionAmount">Amount to contribute</label>
-              <div className={styles.transactionAmount}><span aria-hidden="true">₦</span><input id="contributionAmount" type="number" inputMode="decimal" min="0.01" step="0.01" placeholder="0.00" value={contributionAmount} onChange={(event) => { setContributionAmount(event.target.value); setError(""); }} /></div>
-            </div>
-            <div className={styles.transactionField}>
-              <label htmlFor="contributionPin">Transaction PIN</label>
-              <div className={styles.secretInputWrap}><input id="contributionPin" type={showContributionPin ? "text" : "password"} inputMode="numeric" autoComplete="off" maxLength={4} placeholder="Enter your 4-digit PIN" value={contributionPin} onChange={(event) => { setContributionPin(event.target.value.replace(/\D/g, "").slice(0, 4)); setError(""); }} /><button type="button" className={styles.secretToggle} aria-label={showContributionPin ? "Hide PIN" : "Show PIN"} onClick={() => setShowContributionPin((visible) => !visible)}>{showContributionPin ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
-              <span className={styles.transactionFootnote}>Use the personal PIN you created when setting up your wallet.</span>
-            </div>
-          </div>
-          {error && <p className={styles.goalError} role="alert">{error}</p>}
-          <button className={styles.primaryAction} type="submit" disabled={saving}>Save contribution</button>
-        </form>
-      )}
+      <section hidden={mode !== "contribution"} aria-label="Manual contributions"><div className={styles.manualContributionGrid}>
+        {visibleGoals.filter(goal => !goal.withdrawnAt).map(goal => <ManualContribution key={goal.id} email={email} goal={goal} balance={availableBalance} />)}
+      </div></section>
 
       {mode === null && error && <p className={styles.goalError} role="alert">{error}</p>}
       {notice && <p className={styles.goalNotice} role="status">{notice}</p>}
@@ -252,7 +189,6 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
 
       <p className={styles.disclaimer}>Automatic savings run while StudentSave is open and catch up on due contributions when you return. Insufficient funds wait for a top-up. This demo uses your tracked balance and does not move bank funds.</p>
       {settingsGoal && <ContributionSettingsDialog key={settingsGoal.id} email={email} goal={settingsGoal} onClose={() => setSettingsGoal(null)} />}
-      {successToast && <TransactionSuccessPopup key={successToast.id} message={successToast.message} />}
     </DashboardFrame>
   );
 }

@@ -9,7 +9,7 @@ const compactMoney = new Intl.NumberFormat("en-NG", { notation: "compact", maxim
 const money = (value: number) => `₦${value.toLocaleString("en-NG", { maximumFractionDigits: 2 })}`;
 const safeAmount = (value: number) => Number.isFinite(value) ? Math.max(0, value) : 0;
 
-export function MoneyFlowChart({ points, ariaLabel, showValues = true }: { points: MoneyFlowPoint[]; ariaLabel: string; showValues?: boolean }) {
+export function MoneyFlowChart({ points, ariaLabel, showValues = true, highlightIncome = false }: { points: MoneyFlowPoint[]; ariaLabel: string; showValues?: boolean; highlightIncome?: boolean }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const data = points.map((point) => ({ ...point, income: safeAmount(point.income), expense: safeAmount(point.expense) }));
   const highest = Math.max(1, ...data.flatMap((point) => [point.income, point.expense]));
@@ -58,7 +58,7 @@ export function MoneyFlowChart({ points, ariaLabel, showValues = true }: { point
             </div>
           </div>
         </div>
-        <p className={styles.detail} aria-live="polite">{active ? description(active) : hasActivity ? "Select a period to explore funds added and expenses." : "No fund or expense records in this period yet."}</p>
+        <p className={styles.detail} aria-live="polite">{active ? showValues ? <>{active.label}: funds added <span className={highlightIncome && active.income > 0 ? "funds-added-amount" : undefined}>+{money(active.income)}</span>, expenses {money(active.expense)}</> : description(active) : hasActivity ? "Select a period to explore funds added and expenses." : "No fund or expense records in this period yet."}</p>
       </> : <p className={styles.detail}>No fund or expense records in this period yet.</p>}
     </div>
   );

@@ -1,5 +1,7 @@
 "use client";
 
+import { isSuccessfulCredit } from "../_components/mockFinance";
+
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { DashboardFrame } from "../_components/DashboardFrame";
@@ -290,7 +292,7 @@ function TransactionContent() {
               {recentTransactions.map((transaction) => (
                 <li className={styles.recentTransaction} key={transaction.id}>
                   <div><strong>{transaction.category}</strong><span>{formatDate(transaction.date)}{transaction.recipientName ? ` · To ${transaction.recipientName}` : ""}{transaction.note ? ` · ${transaction.note}` : ""}</span></div>
-                  <b>{transaction.type === "expense" ? "−" : "+"}{formatAmount(transaction.amount)}</b>
+                  <b className={isSuccessfulCredit(transaction) ? "funds-added-amount" : undefined}>{transaction.type === "expense" ? "−" : "+"}{formatAmount(transaction.amount)}</b>
                 </li>
               ))}
             </ul>
@@ -339,7 +341,7 @@ function TransactionContent() {
         </div>
       )}
       {successfulTransaction && <MockReceipt transaction={successfulTransaction} onClose={() => setSuccessfulTransaction(null)} />}
-      {successToast && <TransactionSuccessPopup key={successToast.id} message={successToast.message} />}
+      {successToast && <TransactionSuccessPopup key={successToast.id} message={successToast.message}>{successfulTransaction && isSuccessfulCredit(successfulTransaction) && <strong className="funds-added-amount">+{formatAmount(successfulTransaction.amount)}</strong>}</TransactionSuccessPopup>}
     </DashboardFrame>
   );
 }

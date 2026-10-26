@@ -4,6 +4,7 @@ export type MockTransaction = {
   id: string;
   type: "expense" | "income";
   amount: number;
+  status?: "success" | "completed" | "pending" | "failed";
   category: string;
   date: string;
   note: string;
@@ -49,4 +50,10 @@ export function getMockTransactions(email: string): MockTransaction[] {
     localStorage.removeItem(storageKey);
     return [];
   }
+}
+
+// Legacy local records have no status and represent completed transactions.
+export function isSuccessfulCredit(transaction: MockTransaction) {
+  return transaction.type === "income" && !/withdrawal/i.test(transaction.category)
+    && (!transaction.status || transaction.status === "success" || transaction.status === "completed");
 }

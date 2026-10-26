@@ -1,3 +1,4 @@
+import { ScrollReveal } from "./ScrollReveal";
 import Link from "next/link";
 import { StudentSlogan } from "./StudentSlogan";
 import Image from "next/image";
@@ -115,7 +116,8 @@ function DashboardPreview() {
 
 export default function HomePage() {
   return (
-    <main>
+    <main className="landing-page">
+      <ScrollReveal />
       <header className="site-header">
         <div className="header-inner">
           <Brand />

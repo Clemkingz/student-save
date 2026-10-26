@@ -5,6 +5,7 @@ import { readFinanceList, saveFinance, withFinanceLock } from "../_components/fi
 import { cents, walletCents } from "../_components/savingsAutomation";
 import { Eye, EyeOff } from "lucide-react";
 import { DashboardFrame } from "../_components/DashboardFrame";
+import { AnimatedPadlock } from "../_components/AnimatedPadlock";
 import { TransactionSuccessPopup } from "../_components/TransactionSuccessPopup";
 import { getMockTransactions, localDateValue, type MockTransaction } from "../_components/mockFinance";
 import { verifyTransactionPin } from "../_components/transactionPin";
@@ -69,7 +70,7 @@ function LockSavingsContent() {
   const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [successToast, setSuccessToast] = useState<{ id: string; message: string } | null>(null);
+  const [successToast, setSuccessToast] = useState<{ id: string; message: string; tone?: "success" | "error"; lock?: boolean } | null>(null);
   const endDate = addMonths(startDate, planMonths);
 
   useEffect(() => {
@@ -90,6 +91,7 @@ function LockSavingsContent() {
 
   async function withdrawCommitment(event: FormEvent<HTMLFormElement>, commitmentId: string) {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     try {
       await withFinanceLock(email, async () => {
@@ -112,13 +114,14 @@ function LockSavingsContent() {
         setNotice(`${money(net)} returned to your available balance after the ${money(fee / 100)} collection fee (5%).`);
       });
       setCollectionId(""); setCollectionPin(""); setError("");
-      setSuccessToast({ id: crypto.randomUUID(), message: "Locked savings collected!" });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not collect these savings."); }
+      setSuccessToast({ id: crypto.randomUUID(), message: "Withdrawal successful", tone: "success" });
+    } catch (reason) { const message = reason instanceof Error ? reason.message : "Could not collect these savings."; setError(message); setSuccessToast({ id: crypto.randomUUID(), message, tone: "error" }); }
     finally { setSaving(false); }
   }
 
   async function createCommitment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     const target = Number(targetAmount);
     if (!Number.isFinite(target) || target <= 0) {
       setError("Enter an amount greater than zero.");
@@ -144,7 +147,7 @@ function LockSavingsContent() {
       });
       setTargetAmount(""); setDescription(""); setTransactionPin(""); setError("");
       setNotice(`${money(cents(target) / 100)} locked until ${readableDate(endDate)}. Collection at any time carries a 5% fee.`);
-      setSuccessToast({ id: crypto.randomUUID(), message: "Savings locked successfully!" });
+      setSuccessToast({ id: crypto.randomUUID(), message: "Lock confirmed", lock: true });
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not lock these funds."); }
     finally { setSaving(false); }
   }
@@ -239,7 +242,7 @@ function LockSavingsContent() {
           )}
         </section>
       </div>
-      {successToast && <TransactionSuccessPopup key={successToast.id} message={successToast.message} />}
+      {successToast && <TransactionSuccessPopup key={successToast.id} message={successToast.message} tone={successToast.tone}>{successToast.lock && <AnimatedPadlock />}</TransactionSuccessPopup>}
     </DashboardFrame>
   );
 }
