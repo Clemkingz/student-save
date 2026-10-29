@@ -656,3 +656,82 @@
 .manualContribution .secretInputWrap input { padding-right: 50px; }
 /* The existing teal report card needs pale green amount ink for AA contrast. */
 .reportStats > .balanceCard { --funds-added-ink: var(--success-50); }
+
+/* Fit cards to the space left by the sidebar, including small desktop windows. */
+.mainContent { width: 100%; max-width: 1600px; margin-inline: auto; }
+.sidebar { height: 100dvh; overflow-y: auto; }
+.contentGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); }
+.fundsContentGrid, .transactionGrid, .lockContentGrid, .reportGrid, .settingsGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.goalFormGrid, .budgetFormFields, .studentVerificationFields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
+.transactionField, .transactionField > *, .goalStep, .settingsRow > *, .profilePhotoCopy, .recipientReview { min-width: 0; }
+.transactionField input, .transactionField select, .reportDateRange input { min-width: 0; max-width: 100%; }
+.primaryAction, .secondaryAction { min-width: min(190px, 100%); max-width: 100%; padding-block: 12px; white-space: normal; overflow-wrap: anywhere; text-align: center; }
+.goalActions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.goalActions .primaryAction, .goalActions .secondaryAction { min-width: 0; }
+.goalSummary > div { min-width: 0; flex: 1 1 210px; }
+.goalSummary strong, .paymentAmount strong, .commitmentHeading, .goalHeading, .budgetHeading, .settingsRow, .recipientReview strong, .pageHeading, .fundsPanel { overflow-wrap: anywhere; }
+.activityItem, .recentTransaction, .budgetHeading, .goalHeading, .commitmentHeading, .dashboardPanelHeader, .reportCategoryHeading { flex-wrap: wrap; }
+.activityItem > div, .recentTransaction > div { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+.activityItem b, .recentTransaction b, .goalHeading span, .commitmentHeading span, .reportActivityList b, .reportCategoryHeading span { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.recentTransactions { margin: 0; padding: 0; list-style: none; }
+.reportAlerts li, .reportActivityList li { flex-wrap: wrap; }
+.reportAlerts li > div, .reportActivityList li > div { flex: 1 1 220px; overflow-wrap: anywhere; }
+.reportReceiptButton, .reportAlerts button, .settingsTextButton, .copyAccountButton, .mockResolveButton, .secretToggle { min-height: 44px; }
+.secretToggle { width: 44px; height: 44px; right: 3px; }
+.secretInputWrap input { padding-right: 50px; }
+.scheduleAuthorization, .scheduleAuthorization > *, .goalCardActions, .withdrawalControl, .withdrawTooltip { min-width: 0; max-width: 100%; }
+.scheduleAuthorization .primaryAction, .scheduleAuthorization .secondaryAction { flex: 1 1 180px; }
+.withdrawTooltipText { width: min(220px, calc(100vw - 80px)); }
+.verificationTopMessage { max-width: 100%; }
+.verificationTopMessage strong { font-size: clamp(22px, 2.6vw, 34px); line-height: 1.2; }
+.paymentOverlay { padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+.paymentDialog { min-width: 0; max-height: calc(100dvh - 24px); overscroll-behavior: contain; overflow-wrap: anywhere; }
+.paymentDialog > * { min-width: 0; }
+.paymentClose { width: 44px; height: 44px; top: 10px; right: 10px; }
+.paymentDialog h2 { padding-right: 42px; }
+.goalDialog { max-height: calc(100dvh - 32px); }
+.toast { max-height: calc(100dvh - 32px); overflow-y: auto; }
+
+@media (max-width: 900px) {
+  .appShell { padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
+  .mobileHeader .brand { flex: 1 1 auto; min-width: 0; }
+  .mobileHeader .brand img { width: min(100%, 235px); }
+  .mobileAccountControls { flex: 0 0 auto; }
+  .mobileSettingsLink { min-height: 44px; display: inline-flex; align-items: center; }
+  .mobileProfileAvatar { width: 44px; height: 44px; }
+  .mobileNav { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .mobileNavLink, .mobileNavActive { min-width: 0; min-height: 52px; }
+  .verificationTopMessage strong { font-size: clamp(22px, 4vw, 30px); }
+}
+@media (max-width: 640px) {
+  .contentGrid, .fundsContentGrid, .transactionGrid, .lockContentGrid, .reportGrid, .settingsGrid, .goalFormGrid, .budgetFormFields, .studentVerificationFields { grid-template-columns: minmax(0, 1fr); }
+  .mobileHeader .brand img { width: min(100%, 190px); }
+  .primaryAction, .secondaryAction { min-width: 0; }
+  .profilePhotoPanel { flex-wrap: wrap; }
+  .profilePhotoCopy { flex: 1 1 160px; }
+  .schoolIdUpload, .verificationStatus, .verificationApproved { min-width: 0; overflow-wrap: anywhere; }
+  .topSpendCard, .settingsRow { flex-wrap: wrap; }
+  .settingsRow > div { flex: 1 1 160px; }
+  .reportDateRange { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+  .universityOptions { max-height: min(320px, 40dvh); }
+  .transactionField input, .transactionField select { font-size: 16px; }
+}
+@media (max-width: 380px) {
+  .statGrid, .lockSummary, .reportStats, .goalSummary, .goalActions, .actionRow, .settingsInlineActions { grid-template-columns: minmax(0, 1fr); }
+  .mobileHeader { gap: 10px; padding-inline: 12px; }
+  .mobileHeader .brand img { width: min(100%, 155px); }
+  .bankTransferLauncher { grid-template-columns: 40px minmax(0, 1fr); gap: 10px; padding: 12px; }
+  .bankTransferIcon { width: 40px; height: 40px; }
+  .bankTransferArrow { display: none; }
+  .commitmentItem .secondaryAction, .goalCardActions > button { width: 100%; }
+  .toast { gap: 8px; padding: 10px; }
+  .toast > svg { flex-shrink: 0; }
+}
+.manualContributionGrid { margin-bottom: 20px; }
+.goalsPanel, .monthBudgetPanel { width: 100%; }
+.goalDialog .goalForm { min-width: 0; padding: 0; }
+.contributionChoice > span { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .goalDialog { gap: 12px; }
+  .goalDialog .contributionChoice { gap: 10px; padding: 12px; }
+}

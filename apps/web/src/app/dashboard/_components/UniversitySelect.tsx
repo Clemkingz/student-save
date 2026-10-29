@@ -11,6 +11,20 @@ export function UniversitySelect({ value, onChange }: { value: string; onChange:
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [other, setOther] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 76, maxHeight: 320, above: false });
+  function positionMenu(input: HTMLInputElement) {
+    const rect = input.getBoundingClientRect();
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    const bottomInset = window.innerWidth <= 900 ? 90 : 16;
+    const below = viewportHeight - rect.bottom - bottomInset;
+    const above = rect.top - (window.innerWidth <= 900 ? 90 : 16);
+    const openAbove = below < 200 && above > below;
+    setMenuPosition({
+      top: input.offsetTop + (openAbove ? -4 : input.offsetHeight + 4),
+      maxHeight: Math.max(96, Math.min(320, openAbove ? above : below)),
+      above: openAbove,
+    });
+  }
   const known = nigerianUniversities.some(school => school.name === value);
   const custom = other || Boolean(value && !known);
   const matches = nigerianUniversities.filter(school => `${school.name} ${school.abbreviation ?? ""}`.toLowerCase().includes((query ?? "").toLowerCase()));
@@ -30,14 +44,14 @@ export function UniversitySelect({ value, onChange }: { value: string; onChange:
   }}>
     <label htmlFor={`${id}-search`}>Name of institution</label>
     <input id={`${id}-search`} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-list`} aria-activedescendant={open && active >= 0 ? `${id}-option-${active}` : undefined} autoComplete="off" placeholder="Search university or abbreviation" value={query ?? (custom ? "Other / My school isn’t listed" : value)}
-      onFocus={() => { setOpen(true); setQuery(""); }}
-      onChange={event => { setQuery(event.target.value); setActive(-1); setOpen(true); }}
+      onFocus={event => { positionMenu(event.currentTarget); setOpen(true); setQuery(""); }}
+      onChange={event => { positionMenu(event.currentTarget); setQuery(event.target.value); setActive(-1); setOpen(true); }}
       onKeyDown={event => {
         if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true); move(active + (event.key === "ArrowDown" ? 1 : -1)); }
         else if (event.key === "Enter" && open) { event.preventDefault(); if (active >= 0) select(options[active]?.name ?? otherValue); }
         else if (event.key === "Escape") { event.preventDefault(); setOpen(false); setQuery(null); setActive(-1); }
       }} />
-    {open && <ul id={`${id}-list`} role="listbox" aria-label="Nigerian universities" className={styles.universityOptions}>
+    {open && <ul id={`${id}-list`} role="listbox" aria-label="Nigerian universities" className={styles.universityOptions} style={{ top: menuPosition.top, maxHeight: menuPosition.maxHeight, transform: menuPosition.above ? "translateY(-100%)" : undefined }}>
       {options.map((school, index) => <li key={`${school.type}-${school.name}`} id={`${id}-option-${index}`} role="option" aria-selected={school.name === value} data-active={index === active} onMouseDown={event => event.preventDefault()} onClick={() => select(school.name)}>
         <strong>{school.name}</strong><small>{school.type}{school.abbreviation ? ` · ${school.abbreviation}` : ""}</small>
       </li>)}

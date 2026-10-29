@@ -38,3 +38,9 @@
 @media (prefers-reduced-motion: reduce) {
   .bar { animation: none; transition: none; }
 }
+
+@media (max-width: 380px) {
+  .groups { gap: 2px; padding-inline: 0; }
+  .bars { gap: 2px; }
+  .label { font-size: 9px; padding-inline: 0; }
+}

@@ -18,4 +18,11 @@ The university snapshot contains 77 Federal, 69 State, and 182 Private universit
 - `pnpm --filter web test`
 - `pnpm exec turbo run build -- --webpack`
 
-The default Turbopack build cannot bind its worker port in this sandbox. The supported Webpack build completes for all three apps. Browser interaction and visual checks above still need a normal browser session.
+The default Turbopack build cannot bind its worker port in this sandbox. The supported Webpack build completes for all three apps. Functional money-flow checks above remain available for manual regression testing.
+
+
+## Responsive verification
+
+Checked the landing page, dashboard, Add Funds, Transactions, manual contributions, Lock Savings, Reports, Account, and sign-up in headless Chrome at 320, 375, 768, 1024, and 1440 pixels. The student verification form was checked with a pending test account at phone and desktop widths. Additional checks around the 640, 700, 900, 980, and 1100 pixel breakpoints, and at 1920 pixels, found no horizontal page overflow.
+
+Phone and desktop checks also covered bank-transfer dialogs, receipts, contribution settings, and keyboard university selection. Cards now stack according to available content width; long labels and amounts wrap; receipts and dialogs scroll within the viewport; six-month charts fit narrow screens. The browser used isolated local test data.

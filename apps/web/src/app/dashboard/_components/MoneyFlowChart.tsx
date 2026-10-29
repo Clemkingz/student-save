@@ -33,7 +33,7 @@ export function MoneyFlowChart({ points, ariaLabel, showValues = true, highlight
             {[1, .75, .5, .25, 0].map((fraction) => <span key={fraction}>{showValues ? `₦${compactMoney.format(ceiling * fraction)}` : "•••"}</span>)}
           </div>
           <div className={styles.scrollArea}>
-            <div className={styles.canvas} style={{ "--columns": data.length, minWidth: data.length * 34 } as CSSProperties}>
+            <div className={styles.canvas} style={{ "--columns": data.length, minWidth: data.length > 6 ? data.length * 34 : undefined } as CSSProperties}>
               <div className={styles.grid} aria-hidden="true">{[0, 1, 2, 3, 4].map((line) => <i key={line} />)}</div>
               <div className={styles.groups}>
                 {data.map((point, index) => <button

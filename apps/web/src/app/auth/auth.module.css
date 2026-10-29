@@ -131,3 +131,14 @@
     transition-duration: .01ms !important;
   }
 }
+
+.pageShell, .brandPanel, .formContent, .formCard, .field { min-width: 0; }
+.field input, .selectInput, .currencyInput input { min-width: 0; max-width: 100%; }
+.formContent { overflow-wrap: anywhere; }
+.secretField input { padding-right: 54px; }
+.secretField button { width: 44px; height: 44px; right: 3px; }
+.walletAccountSummary strong { overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .field input, .selectInput, .currencyInput input { font-size: 16px; }
+  .secretField input { padding-right: 54px; }
+}

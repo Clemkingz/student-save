@@ -23,3 +23,23 @@
   .receiptActions { display: none; }
   .receiptPaper { border: 0; border-radius: 0; }
 }
+
+@media screen {
+
+.receiptOverlay { padding: 12px; }
+.receiptDialog { min-width: 0; max-height: calc(100dvh - 24px); overscroll-behavior: contain; }
+.receiptActions { flex-wrap: wrap; }
+.receiptActions button { flex: 1 1 110px; min-height: 44px; }
+.receiptPaper { min-width: 0; }
+.receiptAmount { overflow-wrap: anywhere; }
+.receiptStatus span { flex-shrink: 0; }
+.receiptDetails > div { min-width: 0; }
+.receiptDetails dt, .receiptDetails dd { min-width: 0; overflow-wrap: anywhere; }
+@media screen and (max-width: 380px) {
+  .receiptDialog { padding: 10px; }
+  .receiptPaper { padding: 20px 14px; }
+  .receiptDetails > div { flex-direction: column; gap: 4px; }
+  .receiptDetails dd { text-align: left; }
+}
+
+}
