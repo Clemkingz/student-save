@@ -1,5 +1,5 @@
-.appShell { display: grid; min-height: 100vh; grid-template-columns: 274px minmax(0, 1fr); color: #131927; background: #f4f6f7; }
-.sidebar { position: sticky; top: 0; display: flex; height: 100vh; flex-direction: column; gap: 34px; padding: 28px 23px; border-right: 1px solid #e1e7ec; background: #fff; }
+.appShell { display: grid; min-height: calc(100vh - var(--test-banner-height)); grid-template-columns: 274px minmax(0, 1fr); color: #131927; background: #f4f6f7; }
+.sidebar { position: sticky; top: var(--test-banner-height); display: flex; height: calc(100vh - var(--test-banner-height)); flex-direction: column; gap: 34px; padding: 28px 23px; border-right: 1px solid #e1e7ec; background: #fff; }
 .brand { display: block; width: 100%; }
 .brand img { display: block; width: min(100%, 230px); height: auto; }
 .desktopNav { display: grid; gap: 7px; }
@@ -305,8 +305,6 @@
 .settingsRow strong { color: #202b3d; font-size: 15px; font-weight: 600; }
 .settingsRow span { color: #758198; font-size: 13px; line-height: 1.45; }
 .settingsTextButton { flex: 0 0 auto; padding: 7px 0 7px 8px; border: 0; color: #137d75; background: transparent; font: inherit; font-weight: 700; cursor: pointer; }
-.settingsVerified { flex: 0 0 auto; color: #159050 !important; font-weight: 700; }
-.settingsStatus { flex: 0 0 auto; font-weight: 700; }
 .settingsToggle { position: relative; flex: 0 0 auto; width: 46px; height: 26px; padding: 3px; border: 0; border-radius: 999px; background: #e1e7ec; cursor: pointer; transition: background-color .15s ease; }
 .settingsToggle > span { display: block; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #102a4330; transition: transform .15s ease; }
 .settingsToggleOn { background: #137d75; }
@@ -395,7 +393,7 @@
 @media (max-width: 900px) {
   .appShell { display: block; padding-bottom: 78px; }
   .sidebar { display: none; }
-  .mobileHeader { position: sticky; z-index: 2; top: 0; display: flex; height: 82px; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 22px; border-bottom: 1px solid #e1e7ec; background: #fff; }
+  .mobileHeader { position: sticky; z-index: 2; top: var(--test-banner-height); display: flex; height: 82px; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 22px; border-bottom: 1px solid #e1e7ec; background: #fff; }
   .mobileHeader .brand { width: auto; flex: 0 1 auto; }
   .mobileHeader .brand img { width: min(235px, 75vw); }
   .mobileSettingsLink { display: inline-flex; flex: 0 0 auto; color: #116b65; font-size: 14px; font-weight: 700; text-decoration: none; }
@@ -541,8 +539,7 @@
 }
 
 .accountCard, .statCard, .panel, .fundsPanel, .goalSummary, .goalItem, .reportCategory, .transactionGrid > *, .lockContentGrid > *, .reportGrid > * {
-  animation: interfaceEnter .58s cubic-bezier(.2,.8,.2,1) both;
-  transform-style: preserve-3d;
+  animation: interfaceEnter .58s cubic-bezier(.2,.8,.2,1) backwards;
   transition: transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s ease, border-color .3s ease;
 }
 
@@ -581,7 +578,7 @@
   .accountCard:hover, .statCard:hover, .panel:hover, .fundsPanel:hover, .goalItem:hover, .reportCategory:hover, .transactionGrid > :hover, .lockContentGrid > :hover, .reportGrid > :hover {
     border-color: #c4e1dd;
     box-shadow: 0 15px 32px #122d2b12, 0 3px 8px #122d2b08;
-    transform: perspective(1000px) translateY(-3px) rotateX(.45deg) rotateY(-.35deg);
+    transform: translateY(-3px);
   }
 }
 .mainContent .accountCard:hover, .mainContent .statGrid > .statCard:hover, .mainContent .contentGrid > .panel:hover { border-color: #d8d8de; box-shadow: 0 8px 24px #0000000c; transform: translateY(-2px); }
@@ -659,7 +656,7 @@
 
 /* Fit cards to the space left by the sidebar, including small desktop windows. */
 .mainContent { width: 100%; max-width: 1600px; margin-inline: auto; }
-.sidebar { height: 100dvh; overflow-y: auto; }
+.sidebar { height: calc(100dvh - var(--test-banner-height)); overflow-y: auto; }
 .contentGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); }
 .fundsContentGrid, .transactionGrid, .lockContentGrid, .reportGrid, .settingsGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
 .goalFormGrid, .budgetFormFields, .studentVerificationFields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
@@ -735,3 +732,102 @@
   .goalDialog { gap: 12px; }
   .goalDialog .contributionChoice { gap: 10px; padding: 12px; }
 }
+
+/* Motion. Entrances fill backwards only, so no transform remains on ancestors of fixed overlays. */
+@keyframes riseIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes growBar { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes softPulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+
+.mainContent > * { animation: riseIn .5s cubic-bezier(.22, 1, .36, 1) backwards; }
+.mainContent > :nth-child(2) { animation-delay: 50ms; }
+.mainContent > :nth-child(3) { animation-delay: 100ms; }
+.mainContent > :nth-child(4) { animation-delay: 150ms; }
+.mainContent > :nth-child(5) { animation-delay: 200ms; }
+.mainContent > :nth-child(n + 6) { animation-delay: 250ms; }
+.mainContent[aria-live] { animation: softPulse 1.4s ease-in-out infinite; color: #758198; }
+
+.statCard, .goalItem, .commitmentItem { transition: transform .25s cubic-bezier(.22, 1, .36, 1), box-shadow .25s ease, border-color .25s ease; }
+.statCard:hover, .goalItem:hover, .commitmentItem:hover { transform: translateY(-3px); box-shadow: 0 14px 30px #0d6f6914; }
+.recentTransaction { animation: riseIn .4s cubic-bezier(.22, 1, .36, 1) backwards; transition: background-color .2s ease; }
+.recentTransaction:nth-child(2) { animation-delay: 50ms; }
+.recentTransaction:nth-child(3) { animation-delay: 100ms; }
+.recentTransaction:nth-child(n + 4) { animation-delay: 150ms; }
+
+.primaryAction, .secondaryAction { transition: transform .15s ease, background-color .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.primaryAction:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 18px #0d6f6926; }
+.primaryAction:active:not(:disabled), .secondaryAction:active:not(:disabled) { transform: scale(.97); }
+
+.progressBar, .progressBarWarm { transform-origin: left; animation: growBar .9s cubic-bezier(.22, 1, .36, 1) backwards; transition: width .6s cubic-bezier(.22, 1, .36, 1); }
+
+.paymentOverlay, .mainContent > .paymentOverlay { animation: fadeIn .2s ease backwards; }
+.paymentDialog { animation: popIn .3s cubic-bezier(.22, 1, .36, 1) backwards; }
+.goalDialog::backdrop { animation: fadeIn .2s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mainContent > *, .mainContent[aria-live], .recentTransaction, .progressBar, .progressBarWarm, .paymentOverlay, .mainContent > .paymentOverlay, .paymentDialog, .goalDialog::backdrop { animation: none; }
+  .statCard, .goalItem, .commitmentItem, .primaryAction, .secondaryAction, .progressBar, .progressBarWarm { transition: none; }
+  .statCard:hover, .goalItem:hover, .commitmentItem:hover, .primaryAction:hover:not(:disabled), .primaryAction:active:not(:disabled), .secondaryAction:active:not(:disabled) { transform: none; }
+}
+
+.simActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.simActions .secondaryAction { min-width: 0; min-height: 44px; padding-inline: 18px; }
+.simSection { display: grid; align-content: start; gap: 14px; }
+.simSection h2 { margin: 0; }
+.simSection p { margin: 0; color: #758198; font-size: 14px; line-height: 1.5; }
+.simLog { display: grid; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; }
+.simLog > li { display: grid; gap: 8px; padding: 13px 15px; border: 1px solid #e5e5ea; border-radius: 13px; overflow-wrap: anywhere; }
+.simLogHeading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.simLogHeading span, .simEvent span { color: #758198; font-size: 13px; }
+.simEvent { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding-top: 8px; border-top: 1px solid #efeff2; font-size: 13px; }
+.simEvent .secondaryAction, .simLog .simActions { margin: 0; }
+.simEvent .secondaryAction { min-width: 0; min-height: 38px; padding: 0 14px; font-size: 13px; }
+
+/* Modals */
+.paymentOverlay { background: #0f1f1d8f; backdrop-filter: blur(6px); }
+.goalDialog::backdrop { background: #0f1f1d8f; backdrop-filter: blur(6px); }
+.paymentDialog { border: 0; border-radius: 24px; box-shadow: 0 30px 80px #0b2a2738, 0 4px 14px #0b2a2714; }
+.paymentDialog::before { position: absolute; top: 0; right: 0; left: 0; height: 4px; background: linear-gradient(90deg, #137d75, #7fd6c2); content: ""; }
+.paymentDialog h2 { color: #131927; font-size: 22px; }
+.paymentClose { border: 0; color: #536177; background: #f1f5f4; transition: transform .2s ease, color .2s ease, background-color .2s ease; }
+.paymentClose:hover { transform: rotate(90deg); color: #116b65; background: #e0f5f2; }
+.paymentAmount { border: 0; border-radius: 16px; background: linear-gradient(135deg, #e0f5f2, #f1fbf8); }
+.paymentDialog :is(input:not([type="radio"]), select) { transition: border-color .2s ease, box-shadow .2s ease; }
+.paymentDialog :is(input:not([type="radio"]), select):focus { border-color: #137d75; outline: none; box-shadow: 0 0 0 3px #137d751f; }
+.goalDialog { position: fixed; inset: 0; }
+.confirmActions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 10px; }
+.confirmActions > * { width: 100%; min-width: 0; }
+.dialogLead { display: grid; width: 52px; height: 52px; place-items: center; border-radius: 16px; color: #b91c1c; background: #fef2f2; }
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
+@media (max-width: 640px) {
+  .paymentOverlay { place-items: end center; padding: 0; }
+  .paymentDialog { width: 100%; max-width: 100%; max-height: calc(100dvh - 40px); padding: 30px 18px max(20px, env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; animation: sheetUp .32s cubic-bezier(.22, 1, .36, 1) backwards; }
+  .paymentDialog::before { top: 9px; right: auto; left: 50%; width: 40px; height: 4px; transform: translateX(-50%); border-radius: 4px; background: #d7dfe2; }
+  .goalDialog { margin: auto 0 0; max-height: calc(100dvh - 40px); }
+}
+
+/* Toasts */
+.toast, .toast[data-tone="success"], .toast[data-tone="error"] { overflow: hidden; border-color: #e3e9ec; color: #131927; background: #fff; }
+.toast { top: calc(var(--test-banner-height) + max(12px, env(safe-area-inset-top))); padding: 12px 8px 14px 14px; box-shadow: 0 18px 44px #0b2a2726, 0 2px 8px #0b2a2714; }
+.toast > svg { width: 34px; height: 34px; flex-shrink: 0; padding: 7px; border-radius: 50%; color: #137d75; background: #e0f5f2; }
+.toast[data-tone="error"] > svg { color: #b91c1c; background: #fef2f2; }
+.toast strong { display: block; font-size: 14px; line-height: 1.35; }
+.toast button { color: #758198; transition: color .2s ease, background-color .2s ease; }
+.toast button:hover { color: #131927; background: #f1f5f4; }
+.toast::after { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; transform-origin: left; background: #137d75; content: ""; animation: toastCountdown 3.5s linear both; }
+.toast[data-tone="error"]::after { background: #d13c3c; }
+@keyframes toastCountdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .paymentClose, .toast button { transition: none; }
+  .paymentClose:hover { transform: none; }
+  .paymentDialog { animation: none; }
+  .toast::after { display: none; }
+}
+
+.checkStatusButton { display: inline-flex; min-height: 44px; flex: 0 0 auto; align-items: center; justify-content: center; gap: 8px; }
+.checkStatusButton:disabled { cursor: wait; opacity: .75; }
+.checkStatusButton[aria-busy="true"]::before { width: 14px; height: 14px; border: 2px solid #137d7540; border-top-color: #137d75; border-radius: 50%; content: ""; animation: checkSpin .8s linear infinite; }
+@keyframes checkSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .checkStatusButton[aria-busy="true"]::before { animation: none; } }

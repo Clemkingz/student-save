@@ -1,58 +1,45 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
-import { financeEvent } from "./financeStorage";
-import { runSavingsAutomation } from "./runSavingsAutomation";
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@repo/supabase/browser";
+import { useRefreshFinance, type RpcResult } from "../../../lib/queries/ledger";
 import styles from "../dashboard.module.css";
 
+async function fetchNotice() {
+  const supabase = createClient();
+  const { data } = await supabase.rpc("sim_tick");
+  const tick = data as (RpcResult & { blocked?: string[]; contributed?: number; settled?: number }) | null;
+  const [{ data: goals }, { data: wallet }] = await Promise.all([
+    supabase.from("goal_progress").select("auto_enabled, saved_kobo, target_kobo"),
+    supabase.from("wallet_balances").select("balance_kobo").maybeSingle(),
+  ]);
+  const active = (goals ?? []).some((goal) => goal.auto_enabled && (goal.saved_kobo ?? 0) < (goal.target_kobo ?? 0));
+  const blocked = tick?.blocked ?? [];
+  return {
+    changed: Boolean(tick?.contributed || tick?.settled),
+    message: blocked.length
+      ? `Automatic contributions are waiting for ${blocked.join(", ")}. Your balance is too low; add funds to resume.`
+      : active && wallet?.balance_kobo === 0
+        ? "Your balance is empty. Add funds so your scheduled savings contributions can continue."
+        : "",
+  };
+}
+
 export function SavingsAutomation({ email }: { email: string }) {
-  const [message, setMessage] = useState("");
+  const refreshFinance = useRefreshFinance();
+  const { data } = useQuery({ queryKey: ["automation-notice", email], queryFn: fetchNotice, enabled: Boolean(email), refetchInterval: 30_000 });
+  const changed = data?.changed;
   useEffect(() => {
-    let cancelled = false;
-    const refresh = () => {
-      void runSavingsAutomation(email)
-        .then((result) => {
-          if (cancelled) return;
-          const active = result.goals.some(
-            (goal) =>
-              goal.autoContribute && goal.savedAmount < goal.targetAmount,
-          );
-          setMessage(
-            result.blocked.length
-              ? `Automatic contributions are waiting for ${result.blocked.join(", ")}. Your balance is too low; add funds to resume.`
-              : active && result.balance === 0
-                ? "Your balance is empty. Add funds so your scheduled savings contributions can continue."
-                : "",
-          );
-        })
-        .catch(() => {
-          if (!cancelled)
-            setMessage(
-              "Automatic savings could not be processed. Check browser storage and reload to try again.",
-            );
-        });
-    };
-    refresh();
-    const interval = window.setInterval(refresh, 30_000);
-    window.addEventListener(financeEvent, refresh);
-    window.addEventListener("focus", refresh);
-    const onStorage = (event: StorageEvent) => {
-      if (event.key?.endsWith(`:${email}`) || event.key === null) refresh();
-    };
-    window.addEventListener("storage", onStorage);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-      window.removeEventListener(financeEvent, refresh);
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("storage", onStorage);
-    };
-  }, [email]);
-  return message ? (
+    if (changed) void refreshFinance();
+    // Only react to a new tick that changed something.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
+  return data?.message ? (
     <aside className={styles.savingsBalancePrompt} role="alert">
-      <span>{message}</span>
-      <Link href={`/dashboard/add-funds?email=${encodeURIComponent(email)}`}>
+      <span>{data.message}</span>
+      <Link href="/dashboard/add-funds">
         Add funds
       </Link>
     </aside>

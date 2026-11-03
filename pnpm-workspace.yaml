@@ -3,3 +3,4 @@ packages:
   - "packages/*"
 allowBuilds:
   unrs-resolver: false
+  supabase: true

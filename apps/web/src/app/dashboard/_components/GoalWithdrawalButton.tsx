@@ -2,14 +2,11 @@
 
 import { useId, useRef, useState } from "react";
 import { GoalDialog } from "./GoalDialog";
-import { applyGoalWithdrawal, canWithdrawGoal } from "./goalSettings";
-import { readFinanceList, saveFinance, withFinanceLock } from "./financeStorage";
-import { getMockTransactions, localDateValue } from "./mockFinance";
-import { verifyTransactionPin } from "./transactionPin";
-import type { SavingsGoal } from "./savingsAutomation";
+import { createClient } from "@repo/supabase/browser";
+import { rpcMessage, toKobo, useRefreshFinance, type RpcResult, type SavingsGoal } from "../../../lib/queries/ledger";
 import styles from "../dashboard.module.css";
 
-export function GoalWithdrawalButton({ goal, email }: { goal: SavingsGoal; email: string }) {
+export function GoalWithdrawalButton({ goal }: { goal: SavingsGoal }) {
   const [open, setOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
@@ -18,29 +15,24 @@ export function GoalWithdrawalButton({ goal, email }: { goal: SavingsGoal; email
   const submitting = useRef(false);
   const tooltipId = useId();
   const pinId = useId();
-  const eligible = canWithdrawGoal(goal);
+  const refreshFinance = useRefreshFinance();
+  const eligible = !goal.withdrawnAt && goal.targetAmount > 0 && goal.savedAmount >= goal.targetAmount;
   const tooltip = goal.withdrawnAt ? "This goal has already been withdrawn" : "Available once your goal is reached";
   const money = (amount: number) => `₦${amount.toLocaleString("en-NG", { maximumFractionDigits: 2 })}`;
 
   async function confirm() {
     if (submitting.current) return;
     submitting.current = true; setSaving(true); setError("");
-    try {
-      await withFinanceLock(email, async () => {
-        if (!(await verifyTransactionPin(email, pin))) throw new Error("Enter your correct 4-digit transaction PIN.");
-        const transactions = getMockTransactions(email);
-        const key = `studentsave:savings-goals:${email}`;
-        const goals = readFinanceList<SavingsGoal>(key);
-        const latest = goals.find((item) => item.id === goal.id);
-        if (latest && latest.savedAmount !== goal.savedAmount)
-          throw new Error("The saved amount has changed. Close this dialog and review the goal before withdrawing.");
-        const result = applyGoalWithdrawal(goals, transactions, goal.id, `${localDateValue()}T${new Date().toTimeString().slice(0, 8)}`);
-        saveFinance(email, { [key]: result.goals, [`studentsave:transactions:${email}`]: result.transactions });
-        setNotice(`${money(result.amount)} returned to your tracked balance.`);
-      });
+    const { data, error: rpcError } = await createClient().rpc("withdraw_goal", { p_goal: goal.id, p_expected_saved: toKobo(goal.savedAmount), p_pin: pin });
+    const result = data as RpcResult | null;
+    if (rpcError || !result?.ok) {
+      setError(rpcMessage(result, "Could not withdraw this goal."));
+    } else {
+      setNotice(`${money(goal.savedAmount)} returned to your balance.`);
+      await refreshFinance();
       setOpen(false); setPin("");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not withdraw this goal."); }
-    finally { submitting.current = false; setSaving(false); }
+    }
+    submitting.current = false; setSaving(false);
   }
 
   return (
@@ -52,7 +44,7 @@ export function GoalWithdrawalButton({ goal, email }: { goal: SavingsGoal; email
       </span>
       {notice && <p role="status" className={styles.goalNotice}>{notice}</p>}
       {open && <GoalDialog title="Withdraw savings?" onClose={() => setOpen(false)}>
-        <p>Withdraw {money(goal.savedAmount)} from {goal.name} to your tracked balance? This demo does not transfer bank funds.</p>
+        <p>Withdraw {money(goal.savedAmount)} from {goal.name} to your balance? This is simulated money.</p>
         <form className={styles.goalForm} onSubmit={(event) => { event.preventDefault(); void confirm(); }}>
           <div className={styles.paymentAmount}><span>Amount to withdraw</span><strong>{money(goal.savedAmount)}</strong></div>
           <div className={styles.transactionField}><label htmlFor={pinId}>Transaction PIN</label><input id={pinId} type="password" inputMode="numeric" autoComplete="off" maxLength={4} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))} /></div>

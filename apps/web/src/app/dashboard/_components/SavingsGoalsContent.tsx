@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ManualContribution } from "./ManualContribution";
 import { DashboardFrame } from "./DashboardFrame";
-import { getMockTransactions } from "./mockFinance";
 import { useDashboardSession } from "./useDashboardSession";
 import styles from "../dashboard.module.css";
 
-import { cents, walletCents, normalizeSavingsGoal, type SavingsGoal as Goal } from "./savingsAutomation";
-import { readFinanceList, saveFinance, withFinanceLock } from "./financeStorage";
+import { createClient } from "@repo/supabase/browser";
+import { rpcMessage, toKobo, useGoals, useLedger, useRefreshFinance, type RpcResult, type SavingsGoal as Goal } from "../../../lib/queries/ledger";
 
 import { ContributionSettingsDialog } from "./ContributionSettingsDialog";
 import { GoalWithdrawalButton } from "./GoalWithdrawalButton";
@@ -21,12 +20,13 @@ function money(amount: number) {
 }
 
 export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
-  const { email, ready } = useDashboardSession();
-  const goalsKey = `studentsave:savings-goals:${email}`;
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const { userId, email, ready } = useDashboardSession();
+  const { data: ledger } = useLedger(ready ? userId : "");
+  const { data: goals = [], refetch: refetchGoals } = useGoals(ready ? userId : "");
+  const refreshFinance = useRefreshFinance();
+  const attemptKey = useRef("");
   const [settingsGoal, setSettingsGoal] = useState<Goal | null>(null);
   const [saving, setSaving] = useState(false);
-  const [balance, setBalance] = useState(0);
   const [mode, setMode] = useState<"goal" | "contribution" | null>(null);
   const [goalOption, setGoalOption] = useState(goalOptions[0]);
   const [customName, setCustomName] = useState("");
@@ -35,19 +35,7 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  useEffect(() => {
-    if (!ready || !email) return;
-    const refresh = () => {
-      try {
-        setBalance(Math.max(0, walletCents(getMockTransactions(email))) / 100);
-        setGoals(readFinanceList<Goal>(goalsKey).map(normalizeSavingsGoal));
-      } catch { setError("Your savings records could not be loaded. Please reload and try again."); }
-    };
-    refresh();
-    window.addEventListener("storage", refresh);
-    return () => window.removeEventListener("storage", refresh);
-  }, [email, goalsKey, ready]);
-
+  const balance = ledger?.balance ?? 0;
   const availableBalance = balance;
 
   function openForm(nextMode: "goal" | "contribution") {
@@ -68,47 +56,48 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
       setError("Enter a target amount greater than zero.");
       return;
     }
-    if (cents(target) < 1 || !Number.isSafeInteger(cents(target))) { setError("Enter a valid target of at least ₦0.01."); return; }
+    if (toKobo(target) < 1 || !Number.isSafeInteger(toKobo(target))) { setError("Enter a valid target of at least ₦0.01."); return; }
     setSaving(true);
-    try {
-      await withFinanceLock(email, async () => {
-        const goal: Goal = {
-          id: crypto.randomUUID(), name, targetAmount: cents(target) / 100, savedAmount: 0,
-          contributionAmount: 0, frequency: "monthly", dueDate,
-          createdAt: new Date().toISOString(), contributionMethod: "none", autoContribute: false,
-        };
-        saveFinance(email, { [goalsKey]: [goal, ...readFinanceList<Goal>(goalsKey)] });
-        setSettingsGoal(goal);
-      });
-      setTargetAmount(""); setCustomName(""); setDueDate("");
-      setError(""); setNotice(`${name} goal created. Choose a contribution method now or later.`); setMode(null);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save this goal."); }
-    finally { setSaving(false); }
+    attemptKey.current ||= crypto.randomUUID();
+    const { data, error: rpcError } = await createClient().rpc("create_goal", { p_name: name, p_target: toKobo(target), p_due_date: dueDate || (null as unknown as string), p_idempotency_key: attemptKey.current });
+    const result = data as (RpcResult & { goal_id?: string }) | null;
+    if (rpcError || !result?.ok) {
+      setSaving(false);
+      setError(rpcMessage(result, "Could not save this goal."));
+      return;
+    }
+    attemptKey.current = "";
+    const { data: latest } = await refetchGoals();
+    setSaving(false);
+    setSettingsGoal(latest?.find((goal) => goal.id === result.goal_id) ?? null);
+    setTargetAmount(""); setCustomName(""); setDueDate("");
+    setError(""); setNotice(`${name} goal created. Choose a contribution method now or later.`); setMode(null);
   }
 
   async function pauseContributions(goalId: string) {
     setSaving(true);
-    try {
-      await withFinanceLock(email, () => {
-        const current = readFinanceList<Goal>(goalsKey);
-        saveFinance(email, { [goalsKey]: current.map((goal) => goal.id === goalId ? { ...goal, autoContribute: false } : goal) });
-      });
-      setNotice("Automatic contributions paused."); setError("");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not pause contributions."); }
-    finally { setSaving(false); }
+    const { data, error: rpcError } = await createClient().rpc("pause_goal_contributions", { p_goal: goalId });
+    setSaving(false);
+    const result = data as RpcResult | null;
+    if (rpcError || !result?.ok) {
+      setError(rpcMessage(result, "Could not pause contributions."));
+      return;
+    }
+    await refreshFinance();
+    setNotice("Automatic contributions paused."); setError("");
   }
 
   const visibleGoals = goalId ? goals.filter((goal) => goal.id === goalId) : goals;
   const availableGoals = goals.filter((goal) => !goal.withdrawnAt && goal.savedAmount < goal.targetAmount);
 
-  if (!ready) return <main className={styles.mainContent} aria-live="polite">Loading savings goals…</main>;
+  if (!ready || !ledger) return <main className={styles.mainContent} aria-live="polite">Loading savings goals…</main>;
 
   return (
     <DashboardFrame email={email} active="Savings Goals">
       <header className={styles.pageHeading}>
         <h1>{goalId ? visibleGoals[0]?.name ?? "Goal details" : "Savings goals"}</h1>
         <p>Set a target and save at your own pace from your available balance.</p>
-        {goalId && <Link href={`/dashboard/savings-goals?email=${encodeURIComponent(email)}`}>Back to savings goals</Link>}
+        {goalId && <Link href="/dashboard/savings-goals">Back to savings goals</Link>}
       </header>
 
       <section className={styles.goalSummary} aria-label="Savings balance">
@@ -154,7 +143,7 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
       )}
 
       <section hidden={mode !== "contribution"} aria-label="Manual contributions"><div className={styles.manualContributionGrid}>
-        {visibleGoals.filter(goal => !goal.withdrawnAt).map(goal => <ManualContribution key={goal.id} email={email} goal={goal} balance={availableBalance} />)}
+        {visibleGoals.filter(goal => !goal.withdrawnAt).map(goal => <ManualContribution key={goal.id} goal={goal} balance={availableBalance} />)}
       </div></section>
 
       {mode === null && error && <p className={styles.goalError} role="alert">{error}</p>}
@@ -168,14 +157,14 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
               const progress = Math.min(100, goal.savedAmount / goal.targetAmount * 100);
               return (
                 <article className={styles.goalItem} key={goal.id}>
-                  <div className={styles.goalHeading}><strong>{goalId ? goal.name : <Link href={`/dashboard/savings-goals/${encodeURIComponent(goal.id)}?email=${encodeURIComponent(email)}`}>{goal.name}</Link>}</strong><span>{money(goal.savedAmount)} of {money(goal.targetAmount)}</span></div>
+                  <div className={styles.goalHeading}><strong>{goalId ? goal.name : <Link href={`/dashboard/savings-goals/${encodeURIComponent(goal.id)}`}>{goal.name}</Link>}</strong><span>{money(goal.savedAmount)} of {money(goal.targetAmount)}</span></div>
                   <div className={styles.progressTrack}><div className={styles.progressBar} style={{ width: `${progress}%` }} /></div>
-                  <p>{goal.contributionMethod === "auto" ? `${money(goal.autoAmount ?? goal.contributionAmount)} ${goal.autoFrequency ?? goal.frequency} contribution` : goal.contributionMethod === "manual" ? "Manual contributions · add money whenever you choose" : "No contribution method selected"}{goal.dueDate ? ` · due ${new Date(`${goal.dueDate}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : ""}</p>
+                  <p>{goal.contributionMethod === "auto" ? `${money(goal.autoAmount ?? 0)} ${goal.autoFrequency} contribution` : goal.contributionMethod === "manual" ? "Manual contributions · add money whenever you choose" : "No contribution method selected"}{goal.dueDate ? ` · due ${new Date(`${goal.dueDate}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : ""}</p>
                   <p>{goal.withdrawnAt ? `Withdrawn · ${new Date(goal.withdrawnAt).toLocaleDateString("en-GB")}` : goal.autoContribute ? `Automatic · next due ${goal.nextContributionDate}` : goal.contributionMethod === "auto" ? "Automatic contributions paused" : "Automatic contributions off"}</p>
                   <div className={styles.goalCardActions}>
                     <button className={styles.secondaryAction} type="button" disabled={saving || Boolean(goal.withdrawnAt)} onClick={() => setSettingsGoal(goal)}>Contribution settings</button>
                     {goal.autoContribute && !goal.withdrawnAt && goal.savedAmount < goal.targetAmount && <button className={styles.secondaryAction} type="button" disabled={saving} onClick={() => void pauseContributions(goal.id)}>Pause automatic savings</button>}
-                    <GoalWithdrawalButton goal={goal} email={email} />
+                    <GoalWithdrawalButton goal={goal} />
                   </div>
 
                 </article>
@@ -187,8 +176,8 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
         )}
       </section>
 
-      <p className={styles.disclaimer}>Automatic savings run while StudentSave is open and catch up on due contributions when you return. Insufficient funds wait for a top-up. This demo uses your tracked balance and does not move bank funds.</p>
-      {settingsGoal && <ContributionSettingsDialog key={settingsGoal.id} email={email} goal={settingsGoal} onClose={() => setSettingsGoal(null)} />}
+      <p className={styles.disclaimer}>Automatic savings run on schedule, even when StudentSave is closed. Insufficient funds wait for a top-up. All money here is simulated.</p>
+      {settingsGoal && <ContributionSettingsDialog key={settingsGoal.id} goal={settingsGoal} onClose={() => setSettingsGoal(null)} />}
     </DashboardFrame>
   );
 }

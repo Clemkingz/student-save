@@ -72,7 +72,7 @@ function DashboardPreview() {
 
         <div className="balance-panel">
           <div className="balance-caption"><span>Tracked balance</span><span className="sample-pill"><span /> Example</span></div>
-          <strong className="balance-amount">₦126,500</strong>
+          <strong className="balance-amount" data-count="126500">₦126,500</strong>
           <span className="balance-helper">Based on records you add</span>
           <div className="balance-change"><ArrowUpRight size={14} aria-hidden="true" /> Your records, all in one place</div>
         </div>
@@ -118,6 +118,7 @@ export default function HomePage() {
   return (
     <main className="landing-page">
       <ScrollReveal />
+      <span className="scroll-progress" aria-hidden="true" />
       <header className="site-header">
         <div className="header-inner">
           <Brand />

@@ -6,10 +6,16 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
-    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,css}\"",
+    "supabase:migrations": "supabase migration list --linked",
+    "supabase:push": "supabase db push --linked",
+    "supabase:config": "supabase config diff",
+    "supabase:check": "supabase db query --linked -f supabase/tests/rls_check.sql && supabase db query --linked -f supabase/tests/money_check.sql && cd packages/supabase && node --env-file=../../apps/web/.env.local concurrency_check.mjs",
+    "supabase:types": "supabase gen types typescript --linked --schema public > packages/supabase/src/types.ts"
   },
   "devDependencies": {
     "prettier": "3.9.6",
+    "supabase": "^2.122.0",
     "turbo": "2.10.12",
     "typescript": "7.0.2"
   },

@@ -1,24 +1,15 @@
 "use client";
 
-import { Suspense, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { Suspense, useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { createClient } from "@repo/supabase/browser";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import { UniversitySelect } from "../_components/UniversitySelect";
 import styles from "../dashboard.module.css";
 
-type StudentDetails = {
-  institution: string;
-  matricNumber: string;
-  level: string;
-  course: string;
-  schoolIdImage: string;
-  schoolIdFileName: string;
-  status: "pending" | "submitted" | "verified";
-  submittedAt: string;
-};
+type VerificationStatus = "pending" | "verified" | "rejected" | "not-submitted";
 
 function compressImage(file: File, maxDimension: number, maxDataUrlLength: number) {
   return createImageBitmap(file).then((bitmap) => {
@@ -38,11 +29,12 @@ function compressImage(file: File, maxDimension: number, maxDataUrlLength: numbe
   });
 }
 
+function dataUrlToBlob(dataUrl: string) {
+  return fetch(dataUrl).then((response) => response.blob());
+}
+
 function StudentVerificationContent() {
-  const router = useRouter();
-  const { email, ready } = useDashboardSession();
-  const detailsKey = `studentsave:student-verification:${email}`;
-  const photoKey = `studentsave:profile-picture:${email}`;
+  const { userId, email, ready } = useDashboardSession();
   const [institution, setInstitution] = useState("");
   const [matricNumber, setMatricNumber] = useState("");
   const [level, setLevel] = useState("");
@@ -50,41 +42,66 @@ function StudentVerificationContent() {
   const [schoolIdImage, setSchoolIdImage] = useState("");
   const [schoolIdFileName, setSchoolIdFileName] = useState("");
   const [profilePhoto, setProfilePhoto] = useState("");
-  const [status, setStatus] = useState<StudentDetails["status"] | "not-submitted">("not-submitted");
+  const [schoolIdPath, setSchoolIdPath] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState<VerificationStatus>("not-submitted");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState("");
+
+  const refreshVerification = useCallback(async () => {
+    const supabase = createClient();
+    const { data: details } = await supabase.from("student_verifications").select("*").maybeSingle();
+    if (!details) return null;
+    setInstitution(details.institution);
+    setMatricNumber(details.matric_number);
+    setLevel(details.level);
+    setCourse(details.course);
+    setSchoolIdPath(details.school_id_path);
+    setSchoolIdFileName(details.school_id_file_name);
+    setRejectionReason(details.rejection_reason ?? "");
+    setStatus(details.status);
+    const { data: image } = await supabase.storage.from("school-ids").createSignedUrl(details.school_id_path, 300);
+    setSchoolIdImage(image?.signedUrl ?? "");
+    return details.status;
+  }, []);
+
+  const refreshProfilePhoto = useCallback(async () => {
+    const supabase = createClient();
+    const { data: profile } = await supabase.from("profiles").select("avatar_path").maybeSingle();
+    if (!profile?.avatar_path) {
+      setProfilePhoto("");
+      return;
+    }
+    const { data } = await supabase.storage.from("avatars").createSignedUrl(profile.avatar_path, 3600);
+    setProfilePhoto(data?.signedUrl ?? "");
+  }, []);
 
   useEffect(() => {
     if (!ready || !email) return;
-    const refreshVerification = () => {
-      try {
-        const saved = localStorage.getItem(detailsKey);
-        if (saved) {
-          const details = JSON.parse(saved) as StudentDetails;
-          setInstitution(details.institution || "");
-          setMatricNumber(details.matricNumber || "");
-          setLevel(details.level || "");
-          setCourse(details.course || "");
-          setSchoolIdImage(details.schoolIdImage || "");
-          setSchoolIdFileName(details.schoolIdFileName || "");
-          setStatus(details.status || "submitted");
-        }
-      } catch {
-        localStorage.removeItem(detailsKey);
-      }
+    void refreshVerification();
+    void refreshProfilePhoto();
+  }, [email, ready, refreshProfilePhoto, refreshVerification]);
+
+  useEffect(() => {
+    if (status !== "pending") return;
+    const check = () => void refreshVerification();
+    const interval = window.setInterval(check, 5000);
+    // Browsers slow timers in background tabs, so check again on return.
+    window.addEventListener("focus", check);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", check);
     };
-    refreshVerification();
-    setProfilePhoto(localStorage.getItem(photoKey) || "");
-    const handleStorage = (event: StorageEvent) => { if (event.key === detailsKey) refreshVerification(); };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, [detailsKey, email, photoKey, ready]);
+  }, [refreshVerification, status]);
 
   useEffect(() => {
     if (ready && email && status === "verified") {
-      router.replace(`/dashboard?email=${encodeURIComponent(email)}`);
+      window.location.assign("/dashboard");
     }
-  }, [email, ready, router, status]);
+  }, [email, ready, status]);
 
   async function handleProfilePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -95,7 +112,12 @@ function StudentVerificationContent() {
     }
     try {
       const image = await compressImage(file, 640, 700_000);
-      localStorage.setItem(photoKey, image);
+      const supabase = createClient();
+      const path = `${userId}/avatar-${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(path, await dataUrlToBlob(image), { contentType: "image/jpeg" });
+      if (uploadError) throw new Error("This image could not be saved. Try a smaller image.");
+      const { error: saveError } = await supabase.from("profiles").update({ avatar_path: path }).eq("id", userId);
+      if (saveError) throw new Error("This image could not be saved. Try again.");
       setProfilePhoto(image);
       window.dispatchEvent(new Event("studentsave:profile-picture-updated"));
       setError("");
@@ -125,7 +147,7 @@ function StudentVerificationContent() {
     event.target.value = "";
   }
 
-  function submitDetails(event: FormEvent<HTMLFormElement>) {
+  async function submitDetails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!institution.trim()) { setError("Choose your university or enter your institution using Other."); return; }
     if (!schoolIdImage) {
@@ -133,48 +155,74 @@ function StudentVerificationContent() {
       setNotice("");
       return;
     }
-    const details: StudentDetails = {
-      institution: institution.trim(),
-      matricNumber: matricNumber.trim(),
-      level,
-      course: course.trim(),
-      schoolIdImage,
-      schoolIdFileName,
-      status: "pending",
-      submittedAt: new Date().toISOString(),
-    };
+    setSubmitting(true);
+    setNotice("");
     try {
-      localStorage.setItem(detailsKey, JSON.stringify(details));
+      const supabase = createClient();
+      // This page can be open from before an approval. Check first, so nothing is uploaded for nothing.
+      const { data: current } = await supabase.from("student_verifications").select("status").maybeSingle();
+      if (current?.status === "verified") {
+        setStatus("verified");
+        return;
+      }
+      let path = schoolIdPath;
+      if (schoolIdImage.startsWith("data:")) {
+        path = `${userId}/school-id-${Date.now()}.jpg`;
+        const { error: uploadError } = await supabase.storage.from("school-ids").upload(path, await dataUrlToBlob(schoolIdImage), { contentType: "image/jpeg" });
+        if (uploadError) {
+          setError("Your school ID image could not be uploaded. Check your connection and try again.");
+          return;
+        }
+      }
+      const { data, error: submitError } = await supabase.rpc("submit_student_verification", {
+        p_institution: institution.trim(),
+        p_matric_number: matricNumber.trim(),
+        p_level: level,
+        p_course: course.trim(),
+        p_school_id_path: path,
+        p_school_id_file_name: schoolIdFileName,
+      });
+      const code = (data as { code?: string } | null)?.code;
+      if (code === "already_verified") {
+        setStatus("verified");
+        return;
+      }
+      if (submitError || code) {
+        setError(code === "missing_details" ? "Fill in your institution, matric number, level, and course." : code === "invalid_school_id" ? "Upload your school ID image again." : "We couldn’t submit your details. Check your connection and try again.");
+        return;
+      }
+      setSchoolIdPath(path);
+      setRejectionReason("");
       setStatus("pending");
       setError("");
-      setNotice("Student details saved for mock verification.");
+      setNotice("Student details submitted for review.");
     } catch {
-      setError("There isn’t enough browser storage for this image. Choose a smaller school ID image.");
-      setNotice("");
+      setError("We couldn’t submit your details. Check your connection and try again.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  function removeProfilePhoto() {
-    localStorage.removeItem(photoKey);
+  async function removeProfilePhoto() {
+    const { error: removeError } = await createClient().from("profiles").update({ avatar_path: null }).eq("id", userId);
+    if (removeError) {
+      setError("This picture could not be removed. Try again.");
+      return;
+    }
     setProfilePhoto("");
     window.dispatchEvent(new Event("studentsave:profile-picture-updated"));
     setNotice("Profile picture removed.");
   }
 
-  function checkVerificationStatus() {
-    try {
-      const saved = localStorage.getItem(detailsKey);
-      const details = saved ? JSON.parse(saved) as StudentDetails : null;
-      if (details?.status === "verified") {
-        setStatus("verified");
-        setNotice("Your student verification is approved.");
-        setError("");
-      } else {
-        setNotice("Your submission is still waiting for admin review.");
-      }
-    } catch {
-      setNotice("Your verification submission could not be loaded.");
-    }
+  async function checkVerificationStatus() {
+    if (checking) return;
+    setChecking(true);
+    setCheckResult("");
+    setError("");
+    setNotice("");
+    const latest = await refreshVerification();
+    setChecking(false);
+    setCheckResult(latest === "pending" ? `Still waiting for admin review. Checked at ${new Date().toLocaleTimeString("en-NG", { timeStyle: "short" })}.` : latest ? "" : "We couldn’t check your status. Reload this page and try again.");
   }
 
   if (!ready) return <main className={styles.mainContent} aria-live="polite">Loading student verification…</main>;
@@ -202,7 +250,8 @@ function StudentVerificationContent() {
           </div>
         </section>
 
-        {(status === "pending" || status === "submitted") && <div className={styles.verificationStatus} role="status"><div><strong>Verification pending</strong><span>Your details are waiting for review in the mock admin console.</span></div><button className={styles.recordProgressButton} type="button" onClick={checkVerificationStatus}>Check status</button></div>}
+        {status === "pending" && <div className={styles.verificationStatus} role="status"><div><strong>Verification pending</strong><span>{checkResult || "Your details are waiting for admin review. This page updates by itself."}</span></div><button className={`${styles.recordProgressButton} ${styles.checkStatusButton}`} type="button" disabled={checking} aria-busy={checking} onClick={() => void checkVerificationStatus()}>{checking ? "Checking…" : "Check status"}</button></div>}
+        {status === "rejected" && <div className={styles.verificationStatus} role="alert"><div><strong>Verification rejected</strong><span>{rejectionReason} Update your details and submit again.</span></div></div>}
         {status === "verified" && <div className={styles.verificationApproved} role="status"><div><strong>Student verified</strong><span>Taking you to your dashboard…</span></div></div>}
 
         <form className={`${styles.panel} ${styles.studentVerificationForm}`} onSubmit={submitDetails}>
@@ -215,7 +264,7 @@ function StudentVerificationContent() {
           </div>
 
           <div className={styles.schoolIdUpload}>
-            <div><strong>School ID card</strong><p>Upload a clear photo or scan showing your name and institution. Image files up to 8 MB.</p></div>
+            <div><strong>School ID card</strong><p>Upload a clear photo or scan showing your name and institution. Test mode: use a sample image, not a real ID.</p></div>
             <label className={styles.schoolIdPicker} htmlFor="schoolIdCard">{schoolIdFileName ? "Replace student ID" : "Upload student ID"}</label>
             <input className={styles.visuallyHiddenInput} id="schoolIdCard" type="file" accept="image/*" onChange={handleSchoolId} />
             {schoolIdImage && <div className={styles.schoolIdPreview}><Image src={schoolIdImage} alt="Uploaded school ID card preview" width={900} height={600} unoptimized /><span>{schoolIdFileName || "School ID image"}</span></div>}
@@ -223,13 +272,12 @@ function StudentVerificationContent() {
 
           {error && <p className={styles.goalError} role="alert">{error}</p>}
           {notice && <p className={styles.goalNotice} role="status">{notice}</p>}
-          <button className={styles.primaryAction} type="submit">Upload student details</button>
-          <p className={styles.studentVerificationNote}>This is a mock verification form. Your details and image stay in this browser and are not sent to your school.</p>
+          <button className={styles.primaryAction} type="submit" disabled={submitting}>Upload student details</button>
+          <p className={styles.studentVerificationNote}>Test mode: use made-up details. Nothing is sent to your school.</p>
         </form>
       </div>
       <div className={styles.verificationFooterLinks}>
-        <Link className={styles.backLink} href={`/dashboard/settings?email=${encodeURIComponent(email)}`}>← Back to Account</Link>
-        <Link className={styles.adminReviewLink} href="/admin/student-verifications" target="_blank" rel="noreferrer">Open mock admin review →</Link>
+        <Link className={styles.backLink} href="/dashboard/settings">← Back to Account</Link>
       </div>
     </DashboardFrame>
   );

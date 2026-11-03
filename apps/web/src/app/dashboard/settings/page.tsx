@@ -3,9 +3,10 @@
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient } from "@repo/supabase/browser";
 import { DashboardFrame } from "../_components/DashboardFrame";
+import { GoalDialog } from "../_components/GoalDialog";
 import { useDashboardSession } from "../_components/useDashboardSession";
-import { hashMockPassword } from "../../auth/_components/password";
 import styles from "../dashboard.module.css";
 
 type Notifications = { inApp: boolean; email: boolean; push: boolean };
@@ -13,10 +14,7 @@ const defaultNotifications: Notifications = { inApp: true, email: true, push: fa
 
 function SettingsContent() {
   const router = useRouter();
-  const { email, wallet, ready } = useDashboardSession();
-  const profileKey = `studentsave:profile:${email}`;
-  const notificationKey = `studentsave:notifications:${email}`;
-  const passwordKey = `studentsave:password-change:${email}`;
+  const { userId, email, wallet, ready } = useDashboardSession();
   const [name, setName] = useState("");
   const [nameDraft, setNameDraft] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
@@ -26,58 +24,44 @@ function SettingsContent() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [showPinForm, setShowPinForm] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [pinPassword, setPinPassword] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [pinError, setPinError] = useState("");
   const [notice, setNotice] = useState("");
-  const [verified, setVerified] = useState(false);
 
   useEffect(() => {
     if (!ready || !email) return;
-    let pendingName = "";
-    try {
-      const pending = localStorage.getItem("studentsave:pending-signup");
-      if (pending) {
-        const parsed = JSON.parse(pending) as { email?: string; fullName?: string };
-        if (parsed.email?.toLowerCase() === email) pendingName = parsed.fullName || "";
-      }
-    } catch {
-      // Use the account name saved with this wallet as a fallback.
-    }
-    let savedName = "";
-    try {
-      const profile = localStorage.getItem(profileKey);
-      if (profile) savedName = (JSON.parse(profile) as { name?: string }).name || "";
-    } catch {
-      localStorage.removeItem(profileKey);
-    }
-    setName(savedName || pendingName || wallet?.ownerName || email);
-    try {
-      const storedNotifications = localStorage.getItem(notificationKey);
-      if (storedNotifications) setNotifications({ ...defaultNotifications, ...(JSON.parse(storedNotifications) as Partial<Notifications>) });
-    } catch {
-      localStorage.removeItem(notificationKey);
-    }
-    try {
-      const verification = localStorage.getItem(`studentsave:email-verification:${email}`);
-      setVerified(Boolean(verification && (JSON.parse(verification) as { verified?: boolean }).verified));
-    } catch {
-      setVerified(false);
-    }
-  }, [email, notificationKey, profileKey, ready, wallet]);
+    setName(wallet?.ownerName || email);
+    void createClient().from("notification_preferences").select("*").maybeSingle().then(({ data }) => {
+      if (data) setNotifications({ inApp: data.in_app, email: data.email, push: data.push });
+    });
+  }, [email, ready, wallet]);
 
-  function saveProfile(event: FormEvent<HTMLFormElement>) {
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextName = nameDraft.trim();
     if (!nextName) return;
-    localStorage.setItem(profileKey, JSON.stringify({ name: nextName, updatedAt: new Date().toISOString() }));
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("profiles").update({ full_name: nextName }).eq("id", user?.id ?? "");
+    if (error) {
+      setNotice("We couldn’t update your profile. Try again.");
+      return;
+    }
     setName(nextName);
     setEditingProfile(false);
-    setNotice("Profile updated in mock storage.");
+    setNotice("Profile updated.");
   }
 
-  function toggleNotification(key: keyof Notifications) {
+  async function toggleNotification(key: keyof Notifications) {
     const next = { ...notifications, [key]: !notifications[key] };
     setNotifications(next);
-    localStorage.setItem(notificationKey, JSON.stringify(next));
-    setNotice("Notification preferences saved.");
+    const { error } = await createClient().from("notification_preferences").update({ in_app: next.inApp, email: next.email, push: next.push }).eq("user_id", userId);
+    setNotice(error ? "Notification preferences could not be saved." : "Notification preferences saved.");
   }
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
@@ -94,64 +78,82 @@ function SettingsContent() {
       setPasswordError("The new passwords don’t match.");
       return;
     }
-    const credentialKey = `studentsave:password-hash:${email}`;
-    const savedPasswordHash = localStorage.getItem(credentialKey);
-    if (savedPasswordHash && await hashMockPassword(oldPassword) !== savedPasswordHash) {
+    const supabase = createClient();
+    const { error: currentPasswordError } = await supabase.auth.signInWithPassword({ email, password: oldPassword });
+    if (currentPasswordError) {
       setPasswordError("Your current password is incorrect.");
       return;
     }
-    localStorage.setItem(credentialKey, await hashMockPassword(newPassword));
-    localStorage.setItem(passwordKey, JSON.stringify({ oldPassword, newPassword, changedAt: new Date().toISOString() }));
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) {
+      setPasswordError(updateError.code === "same_password" ? "Choose a password you haven’t used here." : "We couldn’t change your password. Try again.");
+      return;
+    }
     setOldPassword("");
     setNewPassword("");
     setConfirmPassword("");
     setPasswordError("");
     setShowPasswordForm(false);
-    setNotice("Password change saved to mock storage.");
+    setNotice("Password changed.");
   }
 
-  function logOut() {
-    localStorage.removeItem("studentsave:active-email");
+  async function resetPin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinError("Enter a 4-digit PIN.");
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setPinError("The PINs don’t match.");
+      return;
+    }
+    const { data, error } = await createClient().rpc("reset_pin", { p_password: pinPassword, p_new_pin: newPin });
+    const code = (data as { code?: string } | null)?.code;
+    if (error || code) {
+      setPinError(code === "password_incorrect" ? "Your password is incorrect." : code === "pin_locked" ? "Too many wrong attempts. Try again in 15 minutes." : "We couldn’t reset your PIN. Try again.");
+      return;
+    }
+    setPinPassword("");
+    setNewPin("");
+    setConfirmPin("");
+    setPinError("");
+    setShowPinForm(false);
+    setNotice("PIN reset.");
+  }
+
+  async function logOut() {
+    await createClient().auth.signOut();
     router.replace("/auth/sign-in");
   }
 
-  function deleteAccount() {
-    if (!window.confirm("Delete this mock account and its saved StudentSave data from this browser? This cannot be undone.")) return;
-    const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter((key): key is string => Boolean(key));
-    keys.filter((key) => key.includes(email)).forEach((key) => localStorage.removeItem(key));
-    if (localStorage.getItem("studentsave:active-email")?.toLowerCase() === email) localStorage.removeItem("studentsave:active-email");
-    try {
-      const pending = localStorage.getItem("studentsave:pending-signup");
-      if (pending && (JSON.parse(pending) as { email?: string }).email?.toLowerCase() === email) localStorage.removeItem("studentsave:pending-signup");
-    } catch {
-      localStorage.removeItem("studentsave:pending-signup");
+  async function deleteAccount() {
+    setDeleting(true);
+    const supabase = createClient();
+    const { error } = await supabase.functions.invoke("delete-account");
+    setDeleting(false);
+    if (error) {
+      setConfirmingDelete(false);
+      setNotice("Your account could not be deleted. Try again.");
+      return;
     }
+    await supabase.auth.signOut({ scope: "local" });
     router.replace("/auth/sign-up");
   }
 
-  function exportData() {
-    const keysToExport = [
-      `studentsave:transactions:${email}`,
-      `studentsave:fund-additions:${email}`,
-      `studentsave:budgets:${email}`,
-      `studentsave:savings-goals:${email}`,
-      `studentsave:savings-contributions:${email}`,
-      `studentsave:lock-commitments:${email}`,
-      profileKey,
-      notificationKey,
-    ];
-    const data = Object.fromEntries(keysToExport.flatMap((key) => {
-      const value = localStorage.getItem(key);
-      return value === null ? [] : [[key, JSON.parse(value) as unknown]];
-    }));
-    const blob = new Blob([JSON.stringify({ email, exportedAt: new Date().toISOString(), data }, null, 2)], { type: "application/json" });
+  async function exportData() {
+    const { data, error } = await createClient().rpc("export_my_data");
+    if (error || !(data as { ok?: boolean } | null)?.ok) {
+      setNotice("Your data could not be exported. Try again.");
+      return;
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = "studentsave-data.json";
     link.click();
     URL.revokeObjectURL(url);
-    setNotice("Your mock data export has been downloaded.");
+    setNotice("Your data export has been downloaded.");
   }
 
   if (!ready) return <main className={styles.mainContent} aria-live="polite">Loading settings…</main>;
@@ -175,7 +177,6 @@ function SettingsContent() {
           ) : (
             <div className={styles.settingsRows}>
               <div className={styles.settingsRow}><div><strong>{name}</strong><span>{email}</span></div><button className={styles.settingsTextButton} type="button" onClick={() => { setNameDraft(name); setEditingProfile(true); }}>Edit</button></div>
-              <div className={styles.settingsRow}><div><strong>Email {verified ? "verified" : "not verified"}</strong><span>Confirms email ownership only</span></div><span className={verified ? styles.settingsVerified : styles.settingsStatus}>{verified ? "Verified" : "Pending"}</span></div>
               <div className={styles.settingsRow}><div><strong>Account currency</strong><span>{wallet?.currency === "NGN" || !wallet?.currency ? "Nigerian Naira (NGN ₦)" : wallet.currency}</span></div></div>
             </div>
           )}
@@ -184,14 +185,14 @@ function SettingsContent() {
         <section className={styles.panel}>
           <h2>Notifications</h2>
           <div className={styles.settingsRows}>
-            <div className={styles.settingsRow}><div><strong>In-app</strong><span>Budget and goal alerts</span></div><button className={`${styles.settingsToggle} ${notifications.inApp ? styles.settingsToggleOn : ""}`} type="button" role="switch" aria-checked={notifications.inApp} aria-label="In-app notifications" onClick={() => toggleNotification("inApp")}><span /></button></div>
-            <div className={styles.settingsRow}><div><strong>Email</strong><span>Selected reminders</span></div><button className={`${styles.settingsToggle} ${notifications.email ? styles.settingsToggleOn : ""}`} type="button" role="switch" aria-checked={notifications.email} aria-label="Email notifications" onClick={() => toggleNotification("email")}><span /></button></div>
-            <div className={styles.settingsRow}><div><strong>Push</strong><span>Needs browser permission</span></div><button className={`${styles.settingsToggle} ${notifications.push ? styles.settingsToggleOn : ""}`} type="button" role="switch" aria-checked={notifications.push} aria-label="Push notifications" onClick={() => toggleNotification("push")}><span /></button></div>
+            <div className={styles.settingsRow}><div><strong>In-app</strong><span>Budget and goal alerts</span></div><button className={`${styles.settingsToggle} ${notifications.inApp ? styles.settingsToggleOn : ""}`} type="button" role="switch" aria-checked={notifications.inApp} aria-label="In-app notifications" onClick={() => void toggleNotification("inApp")}><span /></button></div>
+            <div className={styles.settingsRow}><div><strong>Email</strong><span>Selected reminders</span></div><button className={`${styles.settingsToggle} ${notifications.email ? styles.settingsToggleOn : ""}`} type="button" role="switch" aria-checked={notifications.email} aria-label="Email notifications" onClick={() => void toggleNotification("email")}><span /></button></div>
+            <div className={styles.settingsRow}><div><strong>Push</strong><span>Needs browser permission</span></div><button className={`${styles.settingsToggle} ${notifications.push ? styles.settingsToggleOn : ""}`} type="button" role="switch" aria-checked={notifications.push} aria-label="Push notifications" onClick={() => void toggleNotification("push")}><span /></button></div>
           </div>
         </section>
       </div>
 
-      <Link className={styles.studentVerificationLink} href={`/dashboard/student-verification?email=${encodeURIComponent(email)}`}>
+      <Link className={styles.studentVerificationLink} href="/dashboard/student-verification">
         <span><strong>Student verification</strong><small>Upload your school ID and add your institution details.</small></span>
         <b aria-hidden="true">→</b>
       </Link>
@@ -200,6 +201,7 @@ function SettingsContent() {
 
       <div className={styles.settingsActions}>
         <button className={styles.secondaryAction} type="button" onClick={() => { setShowPasswordForm((value) => !value); setPasswordError(""); setNotice(""); }}>Change password</button>
+        <button className={styles.secondaryAction} type="button" onClick={() => { setShowPinForm((value) => !value); setPinError(""); setNotice(""); }}>Forgot PIN</button>
         <button className={styles.secondaryAction} type="button" onClick={exportData}>Export my data</button>
       </div>
 
@@ -211,16 +213,31 @@ function SettingsContent() {
         {passwordError && <p className={styles.goalError} role="alert">{passwordError}</p>}
         <button className={styles.primaryAction} type="submit">Save new password</button>
       </form>}
+      {showPinForm && <form className={`${styles.panel} ${styles.settingsPasswordForm}`} onSubmit={resetPin}>
+        <h2>Reset PIN</h2>
+        <div className={styles.transactionField}><label htmlFor="pinPassword">Account password</label><input id="pinPassword" type="password" autoComplete="current-password" value={pinPassword} onChange={(event) => { setPinPassword(event.target.value); setPinError(""); }} required /></div>
+        <div className={styles.transactionField}><label htmlFor="newPin">New PIN</label><input id="newPin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} value={newPin} onChange={(event) => { setNewPin(event.target.value.replace(/\D/g, "")); setPinError(""); }} required /></div>
+        <div className={styles.transactionField}><label htmlFor="confirmNewPin">Confirm new PIN</label><input id="confirmNewPin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} value={confirmPin} onChange={(event) => { setConfirmPin(event.target.value.replace(/\D/g, "")); setPinError(""); }} required /></div>
+        {pinError && <p className={styles.goalError} role="alert">{pinError}</p>}
+        <button className={styles.primaryAction} type="submit">Save new PIN</button>
+      </form>}
       {notice && <p className={styles.goalNotice} role="status">{notice}</p>}
 
       <section className={`${styles.panel} ${styles.settingsAccountActions}`}>
         <h2>Account</h2>
-        <p>Sign out on this device or remove this mock account and its saved data.</p>
+        <p>Sign out on this device, or permanently delete your account and data.</p>
         <div className={styles.settingsActions}>
           <button className={styles.secondaryAction} type="button" onClick={logOut}>Log out</button>
-          <button className={styles.dangerAction} type="button" onClick={deleteAccount}>Delete my account</button>
+          <button className={styles.dangerAction} type="button" onClick={() => setConfirmingDelete(true)}>Delete my account</button>
         </div>
       </section>
+      {confirmingDelete && <GoalDialog title="Delete your account?" onClose={() => setConfirmingDelete(false)}>
+        <p>This removes your wallet, records, and uploaded files. It cannot be undone.</p>
+        <div className={styles.confirmActions}>
+          <button className={styles.secondaryAction} type="button" disabled={deleting} onClick={() => setConfirmingDelete(false)}>Keep my account</button>
+          <button className={styles.dangerAction} type="button" disabled={deleting} onClick={() => void deleteAccount()}>{deleting ? "Deleting…" : "Yes, delete everything"}</button>
+        </div>
+      </GoalDialog>}
     </DashboardFrame>
   );
 }

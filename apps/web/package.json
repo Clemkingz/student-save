@@ -11,7 +11,9 @@
     "test": "tsc --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --outDir .test-build src/app/dashboard/_components/*.test.ts && node --test .test-build/*.test.js"
   },
   "dependencies": {
+    "@repo/supabase": "workspace:*",
     "@repo/ui": "workspace:*",
+    "@tanstack/react-query": "^5.105.0",
     "lucide-react": "^0.545.0",
     "next": "16.3.4",
     "react": "19.2.8",
@@ -21,10 +23,10 @@
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@tailwindcss/postcss": "^4",
-    "babel-plugin-react-compiler": "1.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",

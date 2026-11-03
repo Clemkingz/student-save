@@ -168,3 +168,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 :root { --funds-added-ink: var(--success-700); }
 [data-theme="dark"] { --funds-added-ink: var(--success-300); }
 .funds-added-amount { color: var(--funds-added-ink) !important; }
+
+:root { --test-banner-height: 0px; }
+:root:has(.test-mode-banner) { --test-banner-height: 30px; }
+.test-mode-banner { position: sticky; z-index: 4; top: 0; display: flex; height: var(--test-banner-height); align-items: center; justify-content: center; padding-inline: 12px; color: #714d10; background: #fff3cd; font-size: 13px; font-weight: 700; white-space: nowrap; }

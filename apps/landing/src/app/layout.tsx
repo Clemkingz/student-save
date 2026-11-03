@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#f8fbf9", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body>{process.env.NEXT_PUBLIC_SIMULATION_MODE !== "false" && <div className="test-mode-banner" role="note">Test mode: simulated money</div>}{children}</body></html>;
 }

@@ -2,49 +2,37 @@
 
 import { Eye, EyeOff } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
-import { cents, walletCents, type SavingsGoal, type SavingsContribution } from "./savingsAutomation";
-import { readFinanceList, saveFinance, withFinanceLock } from "./financeStorage";
-import { getMockTransactions, localDateValue, type MockTransaction } from "./mockFinance";
-import { verifyTransactionPin } from "./transactionPin";
+import { createClient } from "@repo/supabase/browser";
+import { rpcMessage, toKobo, useRefreshFinance, type RpcResult, type SavingsGoal } from "../../../lib/queries/ledger";
 import styles from "../dashboard.module.css";
 
-export function ManualContribution({ email, goal, balance }: { email: string; goal: SavingsGoal; balance: number }) {
+export function ManualContribution({ goal, balance }: { goal: SavingsGoal; balance: number }) {
   const [amount, setAmount] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [pin, setPin] = useState("");
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
+  const attemptKey = useRef("");
+  const refreshFinance = useRefreshFinance();
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<number | null>(null);
   const numeric = Number(amount);
-  const valid = Number.isFinite(numeric) && Number.isSafeInteger(cents(numeric)) && numeric >= .01 && cents(numeric) <= cents(Math.min(balance, goal.targetAmount - goal.savedAmount));
+  const valid = Number.isFinite(numeric) && Number.isSafeInteger(toKobo(numeric)) && numeric >= .01 && toKobo(numeric) <= toKobo(Math.min(balance, goal.targetAmount - goal.savedAmount));
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!valid || busy.current) return;
     busy.current = true; setSaving(true); setError(""); setSuccess(null);
-    try {
-      await withFinanceLock(email, async () => {
-        if (!(await verifyTransactionPin(email, pin))) throw new Error("Enter your correct 4-digit transaction PIN.");
-        const goalsKey = `studentsave:savings-goals:${email}`;
-        const contributionsKey = `studentsave:savings-contributions:${email}`;
-        const transactions = getMockTransactions(email);
-        const goals = readFinanceList<SavingsGoal>(goalsKey);
-        const current = goals.find(item => item.id === goal.id);
-        if (!current || current.withdrawnAt) throw new Error("This goal is unavailable.");
-        if (cents(numeric) > walletCents(transactions)) throw new Error("Your balance is too low. Add funds before contributing.");
-        if (cents(numeric) > cents(current.targetAmount) - cents(current.savedAmount)) throw new Error("This amount exceeds the remaining goal target.");
-        const id = crypto.randomUUID();
-        const contribution: SavingsContribution = { id, transactionId: id, goalId: goal.id, amount: cents(numeric) / 100, frequency: current.frequency, date: localDateValue(), createdAt: new Date().toISOString() };
-        const transaction: MockTransaction = { id, type: "expense", amount: contribution.amount, category: "Savings contribution", date: localDateValue(), note: `Contribution to ${current.name}` };
-        saveFinance(email, {
-          [goalsKey]: goals.map(item => item.id === goal.id ? { ...item, savedAmount: (cents(item.savedAmount) + cents(numeric)) / 100 } : item),
-          [contributionsKey]: [contribution, ...readFinanceList<SavingsContribution>(contributionsKey)],
-          [`studentsave:transactions:${email}`]: [transaction, ...transactions],
-        });
-      });
-      setSuccess(cents(numeric) / 100); setAmount(""); setPin("");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save contribution."); }
-    finally { busy.current = false; setSaving(false); }
+    attemptKey.current ||= crypto.randomUUID();
+    const { data, error: rpcError } = await createClient().rpc("contribute_to_goal", { p_goal: goal.id, p_amount: toKobo(numeric), p_pin: pin, p_idempotency_key: attemptKey.current });
+    const result = data as RpcResult | null;
+    if (rpcError || !result?.ok) {
+      setError(rpcMessage(result, "Could not save contribution."));
+    } else {
+      attemptKey.current = "";
+      await refreshFinance();
+      setSuccess(numeric); setAmount(""); setPin("");
+    }
+    busy.current = false; setSaving(false);
   }
   return <form className={`${styles.panel} ${styles.manualContribution}`} onSubmit={submit} noValidate>
     <h3>{goal.name}</h3>

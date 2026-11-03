@@ -4,8 +4,8 @@ import { useState, type FormEvent } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createAdminClient, createClient } from "@repo/supabase/browser";
 import { AuthFrame } from "../_components/AuthFrame";
-import { hashMockPassword } from "../_components/password";
 import styles from "../auth.module.css";
 
 export default function SignInPage() {
@@ -14,21 +14,26 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-    const savedHash = localStorage.getItem(`studentsave:password-hash:${normalizedEmail}`);
-    if (!savedHash) {
-      setNotice("No mock password is saved for this account. Use Forgot password to set one.");
+    setSubmitting(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+    const { data: isAdmin } = error ? { data: false } : await supabase.rpc("is_admin");
+    if (error) {
+      setSubmitting(false);
+      setNotice(error.code === "invalid_credentials" ? "That email and password don’t match." : "We couldn’t sign you in. Try again.");
       return;
     }
-    if (await hashMockPassword(password) !== savedHash) {
-      setNotice("That email and password do not match the saved mock account.");
-      return;
+    if (isAdmin) {
+      // Signing out revokes this session, so admins sign in again under their own cookie.
+      await supabase.auth.signOut({ scope: "local" });
+      await createAdminClient().auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
     }
-    localStorage.setItem("studentsave:active-email", normalizedEmail);
-    router.push(`/dashboard?email=${encodeURIComponent(normalizedEmail)}`);
+    setSubmitting(false);
+    router.push(isAdmin ? "/admin/student-verifications" : "/dashboard");
   }
 
   return (
@@ -48,7 +53,7 @@ export default function SignInPage() {
           <div className={styles.secretField}><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Your password" required value={password} onChange={(event) => { setPassword(event.target.value); setNotice(""); }} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
         </div>
         {notice && <p className={styles.formNotice} role="status">{notice}</p>}
-        <button className={styles.submitButton} type="submit">Sign in</button>
+        <button className={styles.submitButton} type="submit" disabled={submitting}>Sign in</button>
       </form>
       <div className={styles.signinBox}>New to StudentSave? <Link href="/auth/sign-up">Create an account</Link></div>
     </AuthFrame>

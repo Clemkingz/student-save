@@ -1,48 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@repo/supabase/browser";
 import { AuthFrame } from "../_components/AuthFrame";
 import styles from "../auth.module.css";
 
-function createUniqueAccountNumber() {
-  const usedNumbers = new Set<string>();
-  for (let index = 0; index < localStorage.length; index += 1) {
-    const key = localStorage.key(index);
-    if (!key) continue;
-    const value = localStorage.getItem(key);
-    if (!value) continue;
-    if (key.startsWith("studentsave:wallet-account-number:")) {
-      usedNumbers.add(value);
-      continue;
-    }
-    if (key.startsWith("studentsave:wallet:")) {
-      try {
-        const wallet = JSON.parse(value) as { accountNumber?: string };
-        if (wallet.accountNumber) usedNumbers.add(wallet.accountNumber);
-      } catch {
-        // Ignore unrelated or invalid mock wallet records.
-      }
-    }
-  }
-
-  let candidate = "";
-  do {
-    const randomDigits = new Uint8Array(10);
-    crypto.getRandomValues(randomDigits);
-    candidate = `${1 + ((randomDigits[0] ?? 0) % 9)}${Array.from(randomDigits.slice(1), (digit) => digit % 10).join("")}`;
-  } while (usedNumbers.has(candidate));
-  return candidate;
-}
-
-function WalletSetupContent() {
+export default function WalletSetupPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const email = (searchParams.get("email") || "").trim().toLowerCase();
-  const verificationKey = `studentsave:email-verification:${email}`;
-  const walletKey = `studentsave:wallet:${email}`;
-  const accountNumberKey = `studentsave:wallet-account-number:${email}`;
-  const [accountNumber, setAccountNumber] = useState("");
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [ready, setReady] = useState(false);
@@ -51,39 +16,18 @@ function WalletSetupContent() {
   const [confirmPinError, setConfirmPinError] = useState("");
 
   useEffect(() => {
-    if (!email) {
-      router.replace("/auth/verify-email");
-      return;
-    }
-
-    const verification = localStorage.getItem(verificationKey);
-    try {
-      if (!verification || !JSON.parse(verification).verified) {
-        router.replace(`/auth/verify-email?email=${encodeURIComponent(email)}`);
+    void (async () => {
+      const supabase = createClient();
+      const { data: isAdmin } = await supabase.rpc("is_admin");
+      if (isAdmin) {
+        router.replace("/admin/student-verifications");
         return;
       }
-    } catch {
-      router.replace(`/auth/verify-email?email=${encodeURIComponent(email)}`);
-      return;
-    }
-
-    const savedWallet = localStorage.getItem(walletKey);
-    let existingAccountNumber = localStorage.getItem(accountNumberKey);
-    if (savedWallet) {
-      try {
-        const wallet = JSON.parse(savedWallet) as { accountNumber?: string };
-        if (typeof wallet.accountNumber === "string") existingAccountNumber = wallet.accountNumber;
-      } catch {
-        localStorage.removeItem(walletKey);
-      }
-    }
-    if (!existingAccountNumber) {
-      existingAccountNumber = createUniqueAccountNumber();
-    }
-    localStorage.setItem(accountNumberKey, existingAccountNumber);
-    setAccountNumber(existingAccountNumber);
-    setReady(true);
-  }, [accountNumberKey, email, router, verificationKey, walletKey]);
+      const { data: wallet } = await supabase.from("wallets").select("user_id").maybeSingle();
+      if (wallet) router.replace("/dashboard");
+      else setReady(true);
+    })();
+  }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,36 +44,19 @@ function WalletSetupContent() {
       return;
     }
 
-    const salt = new Uint8Array(16);
-    crypto.getRandomValues(salt);
-    const saltHex = Array.from(salt, (byte) => byte.toString(16).padStart(2, "0")).join("");
-    const pinHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${saltHex}:${pin}`));
-    const hashedPin = Array.from(new Uint8Array(pinHash), (byte) => byte.toString(16).padStart(2, "0")).join("");
-    let ownerName = email;
-    const savedProfile = localStorage.getItem(`studentsave:mock-account:${email}`);
-    if (savedProfile) {
-      try {
-        const profile = JSON.parse(savedProfile) as { fullName?: string };
-        if (profile.fullName?.trim()) ownerName = profile.fullName.trim();
-      } catch {
-        // Use the verified email as the account owner label if profile data is unavailable.
-      }
+    setReady(false);
+    const { data, error } = await createClient().rpc("create_wallet", { p_pin: pin });
+    const result = data as { ok?: boolean; code?: string } | null;
+    if (error || (!result?.ok && result?.code !== "wallet_exists")) {
+      setReady(true);
+      setPinError("We couldn’t create your wallet. Try again.");
+      return;
     }
-    localStorage.setItem(walletKey, JSON.stringify({
-      currency: "NGN",
-      accountName: "Sabi Save account",
-      accountNumber,
-      ownerName,
-      email,
-      pinSalt: saltHex,
-      pinHash: hashedPin,
-      createdAt: new Date().toISOString(),
-    }));
     setPinError("");
     setConfirmPinError("");
     setPin("");
     setConfirmPin("");
-    router.push(`/auth/wallet-created?email=${encodeURIComponent(email)}`);
+    router.push("/auth/wallet-created");
   }
 
   return (
@@ -145,19 +72,6 @@ function WalletSetupContent() {
           <select id="currency" name="currency" className={styles.selectInput} value="NGN" disabled>
             <option value="NGN">Nigerian Naira (NGN ₦)</option>
           </select>
-        </div>
-
-        <div className={styles.field}>
-          <label htmlFor="accountNumber">Wallet account number</label>
-          <input
-            id="accountNumber"
-            name="accountNumber"
-            type="text"
-            autoComplete="off"
-            readOnly
-            value={accountNumber}
-            aria-readonly="true"
-          />
         </div>
 
         <div className={styles.field}>
@@ -208,17 +122,9 @@ function WalletSetupContent() {
       </form>
 
       <p className={styles.verificationHint}>
-        Your account number is generated for you. Your PIN is saved as a salted hash on this device.
+        Your test wallet reference is generated for you. Your PIN is stored as a hash on the server, and never in this browser.
       </p>
       {notice && <p className={styles.verificationSuccess} role="status">{notice}</p>}
     </AuthFrame>
-  );
-}
-
-export default function WalletSetupPage() {
-  return (
-    <Suspense fallback={null}>
-      <WalletSetupContent />
-    </Suspense>
   );
 }

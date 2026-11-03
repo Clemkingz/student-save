@@ -1,13 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { DashboardFrame } from "../_components/DashboardFrame";
-import { getMockTransactions, type MockTransaction } from "../_components/mockFinance";
+import { createClient } from "@repo/supabase/browser";
+import { rpcMessage, toKobo, useBudgets, useLedger, type RpcResult } from "../../../lib/queries/ledger";
+import { isSuccessfulCredit } from "../_components/mockFinance";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
 
-type Budget = { id: string; category: string; amount: number; month: string; createdAt: string };
 const categories = ["Food", "Transport", "Travelling", "Textbook", "Laptop", "Accommodation", "Utilities", "Healthcare", "Entertainment", "Data", "Other"];
 
 function money(amount: number) {
@@ -15,49 +16,24 @@ function money(amount: number) {
 }
 
 function BudgetsContent() {
-  const { email, ready } = useDashboardSession();
-  const [transactions, setTransactions] = useState<MockTransaction[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const { userId, email, ready } = useDashboardSession();
+  const { data: ledger } = useLedger(ready ? userId : "");
+  const { data: budgets = [], refetch: refetchBudgets } = useBudgets(ready ? userId : "");
+  const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [category, setCategory] = useState(categories[0]);
   const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const budgetKey = `studentsave:budgets:${email}`;
-  const month = new Date().toISOString().slice(0, 7);
-
-  useEffect(() => {
-    if (!ready || !email) return;
-    const transactionsKey = `studentsave:transactions:${email}`;
-    const refreshTransactions = () => setTransactions(getMockTransactions(email));
-    const handleStorage = (event: StorageEvent) => { if (event.key === transactionsKey) refreshTransactions(); };
-    refreshTransactions();
-    window.addEventListener("storage", handleStorage);
-    const saved = localStorage.getItem(budgetKey);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as Budget[];
-        setBudgets(Array.isArray(parsed) ? parsed : []);
-      } catch {
-        localStorage.removeItem(budgetKey);
-        setBudgets([]);
-      }
-    } else {
-      setBudgets([]);
-    }
-    return () => window.removeEventListener("storage", handleStorage);
-  }, [budgetKey, email, ready]);
-
-  const monthlyTransactions = useMemo(() => transactions.filter((transaction) => transaction.date.startsWith(month)), [month, transactions]);
-  const totalIncome = transactions.filter((transaction) => transaction.type === "income").reduce((sum, transaction) => sum + transaction.amount, 0);
-  const totalExpenses = transactions.filter((transaction) => transaction.type === "expense").reduce((sum, transaction) => sum + transaction.amount, 0);
-  const trackedBalance = Math.max(0, totalIncome - totalExpenses);
+  const month = (ledger?.today ?? new Date().toISOString()).slice(0, 7);
+  const totalIncome = (ledger?.transactions ?? []).filter(isSuccessfulCredit).reduce((sum, transaction) => sum + transaction.amount, 0);
+  const trackedBalance = ledger?.balance ?? 0;
   const budgetCeiling = Math.min(totalIncome, trackedBalance);
   const currentBudgets = budgets.filter((budget) => budget.month === month);
   const totalBudgeted = currentBudgets.reduce((sum, budget) => sum + budget.amount, 0);
   const remainingToBudget = Math.max(0, budgetCeiling - totalBudgeted);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!category) {
       setError("Choose an expense category.");
@@ -82,17 +58,22 @@ function BudgetsContent() {
       return;
     }
 
-    const newBudget: Budget = { id: crypto.randomUUID(), category, amount: roundedAmount, month, createdAt: new Date().toISOString() };
-    const nextBudgets = [...budgets, newBudget];
-    localStorage.setItem(budgetKey, JSON.stringify(nextBudgets));
-    setBudgets(nextBudgets);
+    setSaving(true);
+    const { data, error: rpcError } = await createClient().rpc("create_budget", { p_category: category ?? "", p_amount: toKobo(roundedAmount) });
+    setSaving(false);
+    const result = data as RpcResult | null;
+    if (rpcError || !result?.ok) {
+      setError(rpcMessage(result, "This budget could not be saved. Try again."));
+      return;
+    }
+    await refetchBudgets();
     setAmount("");
     setError("");
     setNotice(`${category} budget created.`);
     setShowForm(false);
   }
 
-  if (!ready) return <main className={styles.mainContent} aria-live="polite">Loading budgets…</main>;
+  if (!ready || !ledger) return <main className={styles.mainContent} aria-live="polite">Loading budgets…</main>;
 
   const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleDateString("en-GB", { month: "long" });
 
@@ -109,7 +90,7 @@ function BudgetsContent() {
         <div><span>Available to budget</span><strong>{money(remainingToBudget)}</strong></div>
       </section>
 
-      {budgetCeiling === 0 && <p className={styles.budgetLimitHint}>No budgetable balance is available. <Link className={styles.budgetHintLink} href={`/dashboard/transactions?email=${encodeURIComponent(email)}`}>Record income or update your transactions</Link> before creating a budget.</p>}
+      {budgetCeiling === 0 && <p className={styles.budgetLimitHint}>No budgetable balance is available. <Link className={styles.budgetHintLink} href="/dashboard/transactions">Record income or update your transactions</Link> before creating a budget.</p>}
 
       <button className={styles.createBudgetButton} type="button" disabled={remainingToBudget <= 0 && !showForm} onClick={() => { if (!showForm) setCategory(categories.find((item) => !currentBudgets.some((budget) => budget.category === item)) || categories[0]); setShowForm((visible) => !visible); setError(""); setNotice(""); }}>
         {showForm ? "Close budget form" : "Create budget"}
@@ -132,7 +113,7 @@ function BudgetsContent() {
           </div>
           <p className={styles.budgetLimitHint}>Your total monthly budgets can’t exceed {money(budgetCeiling)} (the lower of your income and tracked balance). {money(remainingToBudget)} remains available.</p>
           {error && <p className={styles.budgetError} id="budgetAmount-error" role="alert">{error}</p>}
-          <button className={styles.primaryAction} type="submit">Save budget</button>
+          <button className={styles.primaryAction} type="submit" disabled={saving}>Save budget</button>
         </form>
       )}
 
@@ -143,7 +124,7 @@ function BudgetsContent() {
         {currentBudgets.length ? (
           <div className={styles.budgetList}>
             {currentBudgets.map((budget) => {
-              const spent = monthlyTransactions.filter((transaction) => transaction.type === "expense" && transaction.category === budget.category).reduce((sum, transaction) => sum + transaction.amount, 0);
+              const { spent } = budget;
               const percent = Math.min(100, (spent / budget.amount) * 100);
               const remaining = budget.amount - spent;
               return (

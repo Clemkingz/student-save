@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { createClient } from "@repo/supabase/browser";
 
-import { runSavingsAutomation } from "./runSavingsAutomation";
 
 export type DashboardWallet = {
   accountNumber: string;
@@ -16,55 +16,59 @@ export type DashboardWallet = {
 export function useDashboardSession() {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const requestedEmail = searchParams.get("email")?.trim().toLowerCase() || "";
+  const [userId, setUserId] = useState("");
   const [email, setEmail] = useState("");
   const [wallet, setWallet] = useState<DashboardWallet | null>(null);
-  const [profilePicture, setProfilePicture] = useState("");
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const currentEmail = requestedEmail || localStorage.getItem("studentsave:active-email")?.toLowerCase() || "";
-    if (!currentEmail) {
-      router.replace("/auth/sign-up");
-      return;
-    }
-
-    const savedWallet = localStorage.getItem(`studentsave:wallet:${currentEmail}`);
-    if (!savedWallet) {
-      router.replace(`/auth/wallet-setup?email=${encodeURIComponent(currentEmail)}`);
-      return;
-    }
-
-    try {
-      const parsedWallet = JSON.parse(savedWallet) as DashboardWallet;
-      if (!parsedWallet.accountNumber) {
-        router.replace(`/auth/wallet-setup?email=${encodeURIComponent(currentEmail)}`);
+    void (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!user?.email) {
+        router.replace("/auth/sign-in");
         return;
       }
-      const studentDetails = localStorage.getItem(`studentsave:student-verification:${currentEmail}`);
-      let studentVerified = false;
-      try {
-        studentVerified = Boolean(studentDetails && (JSON.parse(studentDetails) as { status?: string }).status === "verified");
-      } catch {
-        studentVerified = false;
+      const { data: isAdmin } = await supabase.rpc("is_admin");
+      if (cancelled) return;
+      if (isAdmin) {
+        // Only sessions from before admins had their own cookie can reach this.
+        await supabase.auth.signOut({ scope: "local" });
+        router.replace("/admin/sign-in");
+        return;
       }
+      const currentEmail = user.email.toLowerCase();
+      const [{ data: savedWallet }, { data: profile }, { data: verification }] = await Promise.all([
+        supabase.from("wallets").select("reference, currency").maybeSingle(),
+        supabase.from("profiles").select("full_name").maybeSingle(),
+        supabase.from("student_verifications").select("status").maybeSingle(),
+      ]);
+      if (cancelled) return;
+      if (!savedWallet) {
+        router.replace("/auth/wallet-setup");
+        return;
+      }
+
       const verificationExempt = pathname === "/dashboard/student-verification" || pathname === "/dashboard/settings";
-      if (!studentVerified && !verificationExempt) {
-        router.replace(`/dashboard/student-verification?email=${encodeURIComponent(currentEmail)}`);
+      if (verification?.status !== "verified" && !verificationExempt) {
+        router.replace("/dashboard/student-verification");
         return;
       }
-      localStorage.setItem("studentsave:active-email", currentEmail);
+      setUserId(user.id);
       setEmail(currentEmail);
-      setWallet(parsedWallet);
-      setProfilePicture(localStorage.getItem(`studentsave:profile-picture:${currentEmail}`) || "");
-      void runSavingsAutomation(currentEmail).catch(() => undefined).then(() => { if (!cancelled) setReady(true); });
-    } catch {
-      router.replace(`/auth/wallet-setup?email=${encodeURIComponent(currentEmail)}`);
-    }
+      setWallet({
+        accountNumber: savedWallet.reference,
+        accountName: "Sabi Save account",
+        ownerName: profile?.full_name || currentEmail,
+        email: currentEmail,
+        currency: savedWallet.currency,
+      });
+      setReady(true);
+    })();
     return () => { cancelled = true; };
-  }, [pathname, requestedEmail, router]);
+  }, [pathname, router]);
 
-  return { email, wallet, profilePicture, ready };
+  return { userId, email, wallet, ready };
 }

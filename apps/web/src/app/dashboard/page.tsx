@@ -2,61 +2,35 @@
 
 import { isSuccessfulCredit } from "./_components/mockFinance";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { GoalWithdrawalButton } from "./_components/GoalWithdrawalButton";
-import type { SavingsGoal as Goal } from "./_components/savingsAutomation";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { DashboardFrame } from "./_components/DashboardFrame";
 import { MoneyFlowChart } from "./_components/MoneyFlowChart";
 import { SchoolStatusBar } from "./_components/SchoolStatusBar";
-import { getMockTransactions, type MockTransaction } from "./_components/mockFinance";
+import { useBudgets, useGoals, useLedger } from "../../lib/queries/ledger";
 import { useDashboardSession } from "./_components/useDashboardSession";
 import styles from "./dashboard.module.css";
 
-type Budget = { id: string; category: string; amount: number; month: string };
-
 function DashboardContent() {
-  const { email, wallet, ready } = useDashboardSession();
-  const [transactions, setTransactions] = useState<MockTransaction[] | null>(null);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const { userId, email, wallet, ready } = useDashboardSession();
+  const { data: ledger } = useLedger(ready ? userId : "");
+  const { data: budgets = [] } = useBudgets(ready ? userId : "");
+  const { data: goals = [] } = useGoals(ready ? userId : "");
   const [showBalances, setShowBalances] = useState(true);
 
-  useEffect(() => {
-    if (!ready || !email) return;
-    const transactionsKey = `studentsave:transactions:${email}`;
-    const refreshTransactions = () => setTransactions(getMockTransactions(email));
-    const refreshSummaries = () => {
-      try {
-        const savedBudgets = JSON.parse(localStorage.getItem(`studentsave:budgets:${email}`) || "[]") as Budget[];
-        setBudgets(Array.isArray(savedBudgets) ? savedBudgets : []);
-      } catch { setBudgets([]); }
-      try {
-        const savedGoals = JSON.parse(localStorage.getItem(`studentsave:savings-goals:${email}`) || "[]") as Goal[];
-        setGoals(Array.isArray(savedGoals) ? savedGoals : []);
-      } catch { setGoals([]); }
-    };
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === transactionsKey) refreshTransactions();
-      if (event.key === `studentsave:budgets:${email}` || event.key === `studentsave:savings-goals:${email}`) refreshSummaries();
-    };
-    refreshTransactions();
-    refreshSummaries();
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, [email, ready]);
-
-  if (!ready || !wallet || !transactions) {
+  if (!ready || !wallet || !ledger) {
     return <main className={styles.mainContent} aria-live="polite">Loading your dashboard…</main>;
   }
 
-  const fundsHref = `/dashboard/add-funds?email=${encodeURIComponent(email)}`;
+  const fundsHref = "/dashboard/add-funds";
+  const transactions = ledger.transactions.filter((transaction) => transaction.status !== "failed");
   const totalIncome = transactions.filter((transaction) => transaction.type === "income").reduce((sum, transaction) => sum + transaction.amount, 0);
   const totalExpenses = transactions.filter((transaction) => transaction.type === "expense").reduce((sum, transaction) => sum + transaction.amount, 0);
-  const trackedBalance = Math.max(0, totalIncome - totalExpenses);
-  const now = new Date();
-  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const trackedBalance = ledger.balance;
+  const now = new Date(`${ledger.today}T12:00:00`);
+  const month = ledger.today.slice(0, 7);
   const monthTransactions = transactions.filter((transaction) => transaction.date.startsWith(month));
   const monthIncome = monthTransactions.filter((transaction) => transaction.type === "income");
   const monthExpenses = monthTransactions.filter((transaction) => transaction.type === "expense");
@@ -65,10 +39,7 @@ function DashboardContent() {
   const currentBudgets = budgets.filter((budget) => budget.month === month);
   const activeGoals = goals.filter((goal) => goal.targetAmount > 0 && goal.savedAmount < goal.targetAmount).slice(0, 3);
   const dashboardGoals = goals.filter((goal) => !goal.withdrawnAt).slice(0, 3);
-  const budgetRows = currentBudgets.slice(0, 3).map((budget) => {
-    const spent = monthExpenses.filter((transaction) => transaction.category === budget.category).reduce((sum, transaction) => sum + transaction.amount, 0);
-    return { ...budget, spent, percent: Math.min(100, budget.amount > 0 ? spent / budget.amount * 100 : 0) };
-  });
+  const budgetRows = currentBudgets.slice(0, 3).map((budget) => ({ ...budget, percent: Math.min(100, budget.amount > 0 ? budget.spent / budget.amount * 100 : 0) }));
   const recentTransactions = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
   const money = (amount: number) => `₦${amount.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   const displayMoney = (amount: number) => showBalances ? money(amount) : "••••••";
@@ -119,7 +90,7 @@ function DashboardContent() {
 
       <div className={styles.actionRow}>
         <Link className={styles.primaryAction} href={fundsHref}>Add funds</Link>
-        <Link className={styles.secondaryAction} href={`/dashboard/transactions?email=${encodeURIComponent(email)}`}>Add expense</Link>
+        <Link className={styles.secondaryAction} href="/dashboard/transactions">Add expense</Link>
       </div>
 
       <div className={styles.contentGrid}>
@@ -140,15 +111,15 @@ function DashboardContent() {
         </section>
 
         <section className={styles.panel}>
-          <div className={styles.dashboardPanelHeader}><div><h2>Budget summary</h2><p>{currentBudgets.length ? `${currentBudgets.length} active this month` : "No budgets set for this month"}</p></div><Link href={`/dashboard/budgets?email=${encodeURIComponent(email)}`}>Manage</Link></div>
+          <div className={styles.dashboardPanelHeader}><div><h2>Budget summary</h2><p>{currentBudgets.length ? `${currentBudgets.length} active this month` : "No budgets set for this month"}</p></div><Link href="/dashboard/budgets">Manage</Link></div>
           {budgetRows.length ? <div className={styles.dashboardMiniList}>{budgetRows.map((budget) => <div className={styles.dashboardMiniProgress} key={budget.id}><div className={styles.budgetHeading}><strong>{budget.category}</strong><span>{displayMoney(budget.spent)} / {displayMoney(budget.amount)}</span></div><div className={styles.progressTrack} role="progressbar" aria-label={`${budget.category} budget usage`} aria-valuenow={Math.round(budget.percent)} aria-valuemin={0} aria-valuemax={100}><div className={styles.progressBar} style={{ width: `${budget.percent}%` }} /></div></div>)}</div> : <p className={styles.budgetRemaining}>Create a monthly budget to track spending by category.</p>}
         </section>
 
         <section className={`${styles.panel} ${styles.savingsPanel}`}>
-          <div className={styles.dashboardPanelHeader}><div><h2>Savings goals</h2><p>{activeGoals.length ? `${activeGoals.length} active goal${activeGoals.length === 1 ? "" : "s"}` : goals.length ? "All goals completed" : "Make progress toward a goal"}</p></div><Link href={`/dashboard/savings-goals?email=${encodeURIComponent(email)}`}>View all</Link></div>
+          <div className={styles.dashboardPanelHeader}><div><h2>Savings goals</h2><p>{activeGoals.length ? `${activeGoals.length} active goal${activeGoals.length === 1 ? "" : "s"}` : goals.length ? "All goals completed" : "Make progress toward a goal"}</p></div><Link href="/dashboard/savings-goals">View all</Link></div>
           {dashboardGoals.length ? <div className={styles.dashboardMiniList}>{dashboardGoals.map((goal) => {
             const percent = Math.min(100, goal.savedAmount / goal.targetAmount * 100);
-            return <div className={styles.dashboardMiniProgress} key={goal.id}><div className={styles.budgetHeading}><strong><Link href={`/dashboard/savings-goals/${encodeURIComponent(goal.id)}?email=${encodeURIComponent(email)}`}>{goal.name}</Link></strong><span>{Math.round(percent)}%</span></div><div className={styles.progressTrack} role="progressbar" aria-label={`${goal.name} savings goal progress`} aria-valuenow={Math.round(percent)} aria-valuemin={0} aria-valuemax={100}><div className={styles.progressBar} style={{ width: `${percent}%` }} /></div><small>{displayMoney(goal.savedAmount)} saved of {displayMoney(goal.targetAmount)}{goal.dueDate ? ` · due ${new Date(`${goal.dueDate}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</small><GoalWithdrawalButton goal={goal} email={email} /></div>;
+            return <div className={styles.dashboardMiniProgress} key={goal.id}><div className={styles.budgetHeading}><strong><Link href={`/dashboard/savings-goals/${encodeURIComponent(goal.id)}`}>{goal.name}</Link></strong><span>{Math.round(percent)}%</span></div><div className={styles.progressTrack} role="progressbar" aria-label={`${goal.name} savings goal progress`} aria-valuenow={Math.round(percent)} aria-valuemin={0} aria-valuemax={100}><div className={styles.progressBar} style={{ width: `${percent}%` }} /></div><small>{displayMoney(goal.savedAmount)} saved of {displayMoney(goal.targetAmount)}{goal.dueDate ? ` · due ${new Date(`${goal.dueDate}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</small><GoalWithdrawalButton goal={goal} /></div>;
           })}</div> : <p className={styles.budgetRemaining}>Set a target and track your savings progress here.</p>}
         </section>
       </div>

@@ -2,30 +2,22 @@
 
 import { isSuccessfulCredit } from "../_components/mockFinance";
 
-import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useRef, useState, type FormEvent } from "react";
+import { createClient } from "@repo/supabase/browser";
 import { Eye, EyeOff } from "lucide-react";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { MockReceipt } from "../_components/MockReceipt";
+import { GoalDialog } from "../_components/GoalDialog";
 import { TransactionSuccessPopup } from "../_components/TransactionSuccessPopup";
-import { getMockTransactions, localDateValue, type MockTransaction } from "../_components/mockFinance";
-import { saveFinance, withFinanceLock } from "../_components/financeStorage";
-import { walletCents } from "../_components/savingsAutomation";
-import { verifyTransactionPin } from "../_components/transactionPin";
+import { localDateValue, type MockTransaction } from "../_components/mockFinance";
+import { rpcMessage, toKobo, useLedger, useRefreshFinance, type RpcResult } from "../../../lib/queries/ledger";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
 
 type TransactionType = "expense" | "income" | "withdrawal";
-type Transaction = MockTransaction;
-type MockBank = { name: string; code: string };
+type Bank = { name: string; code: string };
 
-const mockBanks: MockBank[] = [
-  { name: "Access Bank", code: "044" },
-  { name: "First Bank of Nigeria", code: "011" },
-  { name: "Guaranty Trust Bank", code: "058" },
-  { name: "United Bank for Africa", code: "033" },
-  { name: "Zenith Bank", code: "057" },
-];
-const expenseCategories = ["Food", "Transport", "Travelling", "Textbook", "Laptop", "Accommodation", "Utilities", "Healthcare", "Entertainment", "Other"];
+const expenseCategories = ["Food", "Transport", "Travelling", "Textbook", "Laptop", "Accommodation", "Utilities", "Healthcare", "Entertainment", "Data", "Other"];
 const incomeCategories = ["Allowance", "Salary", "Scholarship", "Gift", "Freelance", "Other"];
 
 function formatDate(value: string) {
@@ -37,21 +29,31 @@ function formatAmount(value: number) {
 }
 
 function TransactionContent() {
-  const { email, ready } = useDashboardSession();
+  const { userId, email, ready } = useDashboardSession();
+  const { data: ledger, refetch } = useLedger(ready ? userId : "");
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<string>(expenseCategories[0] ?? "Other");
   const [date, setDate] = useState(localDateValue());
   const [note, setNote] = useState("");
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [showRecipientDialog, setShowRecipientDialog] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
-  const [successfulTransaction, setSuccessfulTransaction] = useState<Transaction | null>(null);
+  const [receiptId, setReceiptId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const attemptKey = useRef("");
+  const refreshFinance = useRefreshFinance();
+  const [editing, setEditing] = useState<{ transaction: MockTransaction; mode: "edit" | "delete" } | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editNote, setEditNote] = useState("");
+  const [editPin, setEditPin] = useState("");
+  const [editError, setEditError] = useState("");
   const [successToast, setSuccessToast] = useState<{ id: string; message: string } | null>(null);
   const [recipientName, setRecipientName] = useState("");
-  const banks = mockBanks;
+  const [banks, setBanks] = useState<Bank[]>([]);
   const [recipientBankCode, setRecipientBankCode] = useState("");
   const [recipientAccountNumber, setRecipientAccountNumber] = useState("");
   const [accountResolved, setAccountResolved] = useState(false);
@@ -60,17 +62,44 @@ function TransactionContent() {
   const [paymentError, setPaymentError] = useState("");
   const [transactionPin, setTransactionPin] = useState("");
   const [showPin, setShowPin] = useState(false);
-  const storageKey = `studentsave:transactions:${email}`;
   const categories = type === "expense" ? expenseCategories : type === "withdrawal" ? ["Withdrawal"] : incomeCategories;
-  const balance = Math.max(0, transactions.reduce((sum, transaction) => sum + (transaction.type === "income" ? transaction.amount : -transaction.amount), 0));
+  const transactions = ledger?.transactions ?? [];
+  const balance = ledger?.balance ?? 0;
+  const successfulTransaction = transactions.find((transaction) => transaction.id === receiptId) ?? null;
 
   useEffect(() => {
-    if (!ready || !email) return;
-    const refreshTransactions = () => setTransactions(getMockTransactions(email));
-    refreshTransactions();
-    window.addEventListener("storage", refreshTransactions);
-    return () => window.removeEventListener("storage", refreshTransactions);
-  }, [email, ready, storageKey]);
+    if (!ready) return;
+    void createClient().rpc("sim_list_banks").then(({ data }) => setBanks((data as { banks?: Bank[] } | null)?.banks ?? []));
+  }, [ready]);
+
+  function openEditor(transaction: MockTransaction, mode: "edit" | "delete") {
+    setEditing({ transaction, mode });
+    setEditAmount(String(transaction.amount));
+    setEditCategory(transaction.category);
+    setEditDate(transaction.date);
+    setEditNote(transaction.note);
+    setEditPin("");
+    setEditError("");
+  }
+
+  async function saveEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    setSubmitting(true);
+    const supabase = createClient();
+    const { data, error: rpcError } = editing.mode === "delete"
+      ? await supabase.rpc("delete_transaction", { p_id: editing.transaction.id, p_pin: editPin })
+      : await supabase.rpc("update_transaction", { p_id: editing.transaction.id, p_amount: toKobo(Number(editAmount)), p_category: editCategory, p_occurred_on: editDate, p_note: editNote.trim(), p_pin: editPin });
+    setSubmitting(false);
+    const result = data as RpcResult | null;
+    if (rpcError || !result?.ok) {
+      setEditError(rpcMessage(result, "This record could not be changed. Try again."));
+      return;
+    }
+    await refreshFinance();
+    setNotice(editing.mode === "delete" ? "Transaction deleted." : "Transaction updated.");
+    setEditing(null);
+  }
 
   function changeType(nextType: TransactionType) {
     setType(nextType);
@@ -100,27 +129,29 @@ function TransactionContent() {
     }
 
     if (type === "income") {
-      try { await withFinanceLock(email, () => {
-      const transaction: Transaction = {
-        id: crypto.randomUUID(),
-        amount: Math.round(numericAmount * 100) / 100,
-        type: "income",
-        category,
-        date,
-        note: note.trim() || "Manually recorded funds",
-        receiptNumber: `SS-${Date.now()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
-        receiptCreatedAt: new Date().toISOString(),
-      };
-      const nextTransactions = [transaction, ...getMockTransactions(email)];
-      saveFinance(email, { [storageKey]: nextTransactions });
-      setTransactions(nextTransactions);
+      setSubmitting(true);
+      attemptKey.current ||= crypto.randomUUID();
+      const { data, error: rpcError } = await createClient().rpc("record_income", {
+        p_amount: toKobo(numericAmount),
+        p_category: category,
+        p_occurred_on: date,
+        p_note: note.trim(),
+        p_idempotency_key: attemptKey.current,
+      });
+      setSubmitting(false);
+      const result = data as RpcResult | null;
+      if (rpcError || !result?.ok) {
+        setError(rpcMessage(result, "Funds could not be saved. Try again."));
+        return;
+      }
+      attemptKey.current = "";
+      await refetch();
       setAmount("");
       setNote("");
       setError("");
-      setNotice("Funds added successfully.");
-      setSuccessfulTransaction(transaction);
+      setNotice("Test credit added.");
+      setReceiptId(String(result.transaction_id));
       setSuccessToast({ id: crypto.randomUUID(), message: "Funds added successfully!" });
-      }); } catch { setError("Funds could not be saved. Check browser storage and try again."); }
       return;
     }
 
@@ -129,7 +160,7 @@ function TransactionContent() {
     setShowRecipientDialog(true);
   }
 
-  function resolveRecipientAccount() {
+  async function resolveRecipientAccount() {
     setResolutionError("");
     setAccountResolved(false);
     setRecipientName("");
@@ -142,21 +173,22 @@ function TransactionContent() {
       return;
     }
     setResolvingAccount(true);
-    const knownMockNames: Record<string, string> = {
-      "0123456789": "Ada Okafor",
-      "1234567890": "Tunde Balogun",
-      "0000000000": "StudentSave Test Recipient",
-    };
-    setRecipientName(knownMockNames[recipientAccountNumber] || `Mock Recipient ${recipientAccountNumber.slice(-4)}`);
-    setAccountResolved(true);
+    const { data, error: rpcError } = await createClient().rpc("resolve_recipient", { p_bank_code: recipientBankCode, p_account_number: recipientAccountNumber });
     setResolvingAccount(false);
+    const result = data as (RpcResult & { name?: string }) | null;
+    if (rpcError || !result?.ok || !result.name) {
+      setResolutionError(rpcMessage(result, "We couldn’t look up this account. Try again."));
+      return;
+    }
+    setRecipientName(result.name);
+    setAccountResolved(true);
   }
 
   function continueToPin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedAccountNumber = recipientAccountNumber.replace(/\s/g, "");
     if (!recipientName.trim() || !accountResolved) {
-      setPaymentError("Find the mock recipient account name before continuing.");
+      setPaymentError("Find the recipient account name before continuing.");
       return;
     }
     if (!banks.some((bank) => bank.code === recipientBankCode)) {
@@ -179,39 +211,32 @@ function TransactionContent() {
       setPaymentError("Enter your 4-digit transaction PIN to continue.");
       return;
     }
-    if (!(await verifyTransactionPin(email, transactionPin))) {
-      setPaymentError("That transaction PIN is incorrect.");
+    setSubmitting(true);
+    attemptKey.current ||= crypto.randomUUID();
+    const { data, error: rpcError } = await createClient().rpc("start_transfer", {
+      p_kind: type,
+      p_amount: toKobo(Number(amount)),
+      p_category: type === "withdrawal" ? "Withdrawal" : category,
+      p_occurred_on: date,
+      p_note: note.trim(),
+      p_bank_code: recipientBankCode,
+      p_account_number: normalizedAccountNumber,
+      p_pin: transactionPin,
+      p_idempotency_key: attemptKey.current,
+    });
+    setSubmitting(false);
+    const result = data as RpcResult | null;
+    if (rpcError || !result?.ok) {
+      if (result?.code !== "pin_incorrect") attemptKey.current = "";
+      setPaymentError(rpcMessage(result, "Payment could not be started. Try again."));
       return;
     }
-    try { await withFinanceLock(email, () => {
-    const latest = getMockTransactions(email);
-    const currentBalance = Math.max(0, walletCents(latest)) / 100;
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || numericAmount > currentBalance) {
-      setPaymentError(`This payment is above your available balance of ${formatAmount(currentBalance)}. Check the amount and try again.`);
-      return;
-    }
-    const selectedBank = banks.find((bank) => bank.code === recipientBankCode);
-    const transaction: Transaction = {
-      id: crypto.randomUUID(),
-      type: "expense",
-      amount: Math.round(numericAmount * 100) / 100,
-      category: type === "withdrawal" ? "Withdrawal" : category,
-      date,
-      note: note.trim() || (type === "withdrawal" ? "Cash withdrawal" : ""),
-      recipientName: recipientName.trim(),
-      recipientBank: selectedBank?.name || "",
-      recipientAccountNumber: normalizedAccountNumber,
-      receiptNumber: `SS-${Date.now()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
-      receiptCreatedAt: new Date().toISOString(),
-    };
-    const nextTransactions = [transaction, ...latest];
-    saveFinance(email, { [storageKey]: nextTransactions });
-    setTransactions(nextTransactions);
+    attemptKey.current = "";
+    await refetch();
     setAmount("");
     setNote("");
     setError("");
-    setNotice(`${type === "withdrawal" ? "Withdrawal" : "Expense"} saved to mock storage.`);
+    setNotice(`${type === "withdrawal" ? "Withdrawal" : "Payment"} sent to the simulated bank.`);
     setRecipientName("");
     setRecipientBankCode("");
     setRecipientAccountNumber("");
@@ -221,14 +246,13 @@ function TransactionContent() {
     setPaymentError("");
     setShowRecipientDialog(false);
     setShowPinDialog(false);
-    setSuccessfulTransaction(transaction);
-    setSuccessToast({ id: crypto.randomUUID(), message: type === "withdrawal" ? "Withdrawal successful!" : "Payment successful!" });
-    }); } catch { setPaymentError("Payment could not be saved. Check browser storage and try again."); }
+    setReceiptId(String(result.transaction_id));
+    setSuccessToast({ id: crypto.randomUUID(), message: type === "withdrawal" ? "Withdrawal started" : "Payment started" });
   }
 
   const recentTransactions = transactions.filter((transaction) => type === "income" ? transaction.type === "income" : type === "withdrawal" ? transaction.type === "expense" && transaction.category === "Withdrawal" : transaction.type === "expense" && transaction.category !== "Withdrawal").slice(0, 8);
 
-  if (!ready) {
+  if (!ready || !ledger) {
     return <main className={styles.mainContent} aria-live="polite">Loading transactions…</main>;
   }
 
@@ -281,8 +305,8 @@ function TransactionContent() {
           </div>
 
           {notice && <p className={styles.transactionSaved} role="status">{notice}</p>}
-          {type === "income" && <p className={styles.transactionFootnote}>Funds are added to your tracked balance immediately.</p>}
-          <button className={styles.primaryAction} type="submit">{type === "income" ? "Add funds" : type === "withdrawal" ? "Send withdrawal to account" : "Pay / save expense"}</button>
+          {type === "income" && <p className={styles.transactionFootnote}>This is a test credit. It is added to your balance immediately.</p>}
+          <button className={styles.primaryAction} type="submit" disabled={submitting}>{type === "income" ? "Add funds" : type === "withdrawal" ? "Send withdrawal to account" : "Pay / save expense"}</button>
         </form>
 
         <section className={styles.panel} aria-live="polite">
@@ -291,15 +315,16 @@ function TransactionContent() {
             <ul className={styles.recentTransactions}>
               {recentTransactions.map((transaction) => (
                 <li className={styles.recentTransaction} key={transaction.id}>
-                  <div><strong>{transaction.category}</strong><span>{formatDate(transaction.date)}{transaction.recipientName ? ` · To ${transaction.recipientName}` : ""}{transaction.note ? ` · ${transaction.note}` : ""}</span></div>
+                  <div><strong>{transaction.category}</strong><span>{formatDate(transaction.date)}{transaction.recipientName ? ` · To ${transaction.recipientName}` : ""}{transaction.note ? ` · ${transaction.note}` : ""}{transaction.status === "pending" ? " · Pending" : transaction.status === "failed" ? " · Failed" : ""}</span></div>
                   <b className={isSuccessfulCredit(transaction) ? "funds-added-amount" : undefined}>{transaction.type === "expense" ? "−" : "+"}{formatAmount(transaction.amount)}</b>
+                  {transaction.status === "completed" && ["income", "expense"].includes(transaction.kind) && <span className={styles.goalCardActions}><button className={styles.settingsTextButton} type="button" onClick={() => openEditor(transaction, "edit")}>Edit</button><button className={styles.settingsTextButton} type="button" onClick={() => openEditor(transaction, "delete")}>Delete</button></span>}
                 </li>
               ))}
             </ul>
           ) : (
             <p className={styles.emptyTransactions}>No {type === "income" ? "funds added" : type === "withdrawal" ? "withdrawals" : "expenses"} yet. Save one to see it here.</p>
           )}
-          <p className={styles.transactionFootnote}>Transactions are saved in this browser for mock testing.</p>
+          <p className={styles.transactionFootnote}>Test mode: all money and banks here are simulated.</p>
         </section>
       </div>
 
@@ -312,10 +337,10 @@ function TransactionContent() {
             <p>{type === "withdrawal" ? "Enter where this withdrawal should be sent." : "Enter the account receiving this payment."}</p>
             <div className={styles.paymentAmount}><span>Amount</span><strong>{formatAmount(Number(amount) || 0)}</strong><small>{type === "withdrawal" ? "Cash withdrawal" : category}</small></div>
             <div className={styles.transactionField}><label htmlFor="recipientBank">Recipient bank</label><select id="recipientBank" value={recipientBankCode} onChange={(event) => { setRecipientBankCode(event.target.value); setRecipientName(""); setAccountResolved(false); setPaymentError(""); setResolutionError(""); }}><option value="">Select bank</option>{banks.map((bank) => <option key={bank.code} value={bank.code}>{bank.name}</option>)}</select></div>
-            <div className={styles.transactionField}><label htmlFor="recipientAccountNumber">Recipient account number</label><input id="recipientAccountNumber" inputMode="numeric" autoComplete="off" maxLength={10} value={recipientAccountNumber} onChange={(event) => { setRecipientAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10)); setRecipientName(""); setAccountResolved(false); setResolutionError(""); setPaymentError(""); }} placeholder="10-digit account number" /><button className={styles.mockResolveButton} type="button" onClick={resolveRecipientAccount} disabled={resolvingAccount || !recipientBankCode || recipientAccountNumber.length !== 10}>{resolvingAccount ? "Looking up mock account…" : accountResolved ? "Mock account ready" : "Find account name"}</button>{resolutionError && <span className={styles.transactionError} role="alert">{resolutionError}</span>}</div>
-            <div className={styles.transactionField}><label htmlFor="recipientName">Recipient account name</label><input id="recipientName" autoComplete="off" readOnly value={recipientName} placeholder={accountResolved ? "Mock recipient name" : "Find the account name"} /><span className={styles.transactionFootnote}>Recipient details are simulated for testing.</span></div>
+            <div className={styles.transactionField}><label htmlFor="recipientAccountNumber">Recipient account number</label><input id="recipientAccountNumber" inputMode="numeric" autoComplete="off" maxLength={10} value={recipientAccountNumber} onChange={(event) => { setRecipientAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10)); setRecipientName(""); setAccountResolved(false); setResolutionError(""); setPaymentError(""); }} placeholder="10-digit account number" /><button className={styles.mockResolveButton} type="button" onClick={resolveRecipientAccount} disabled={resolvingAccount || !recipientBankCode || recipientAccountNumber.length !== 10}>{resolvingAccount ? "Looking up account…" : accountResolved ? "Account found" : "Find account name"}</button>{resolutionError && <span className={styles.transactionError} role="alert">{resolutionError}</span>}</div>
+            <div className={styles.transactionField}><label htmlFor="recipientName">Recipient account name</label><input id="recipientName" autoComplete="off" readOnly value={recipientName} placeholder="Find the account name" /><span className={styles.transactionFootnote}>Recipient details are simulated for testing.</span></div>
             {paymentError && <p className={styles.goalError} role="alert">{paymentError}</p>}
-            <p className={styles.paymentMockNotice}>This prototype uses mock recipient details and records the payment locally. It does not transfer real money.</p>
+            <p className={styles.paymentMockNotice}>Test mode: this goes through a simulated bank. No real money moves.</p>
             <button className={styles.primaryAction} type="submit">Continue to transaction PIN</button>
           </form>
         </div>
@@ -336,11 +361,24 @@ function TransactionContent() {
             </div>
             <div className={styles.transactionField}><label htmlFor="transactionPin">Transaction PIN</label><div className={styles.secretInputWrap}><input id="transactionPin" type={showPin ? "text" : "password"} inputMode="numeric" autoComplete="off" maxLength={4} autoFocus value={transactionPin} onChange={(event) => { setTransactionPin(event.target.value.replace(/\D/g, "").slice(0, 4)); setPaymentError(""); }} placeholder="Enter your 4-digit PIN" /><button type="button" className={styles.secretToggle} aria-label={showPin ? "Hide PIN" : "Show PIN"} onClick={() => setShowPin((visible) => !visible)}>{showPin ? <EyeOff size={18} /> : <Eye size={18} />}</button></div><span className={styles.transactionFootnote}>Use the personal PIN you created when setting up your wallet.</span></div>
             {paymentError && <p className={styles.goalError} role="alert">{paymentError}</p>}
-            <button className={styles.primaryAction} type="submit">Confirm {type === "withdrawal" ? "withdrawal" : "payment"}</button>
+            <button className={styles.primaryAction} type="submit" disabled={submitting}>Confirm {type === "withdrawal" ? "withdrawal" : "payment"}</button>
           </form>
         </div>
       )}
-      {successfulTransaction && <MockReceipt transaction={successfulTransaction} onClose={() => setSuccessfulTransaction(null)} />}
+      {editing && <GoalDialog title={editing.mode === "delete" ? "Delete this transaction?" : "Edit transaction"} onClose={() => setEditing(null)}>
+        <form className={styles.goalForm} onSubmit={saveEdit} noValidate>
+          {editing.mode === "delete" ? <p>{editing.transaction.category} · {formatAmount(editing.transaction.amount)}. Your balance, budgets, and reports will update.</p> : <>
+            <div className={styles.transactionField}><label htmlFor="editAmount">Amount (₦)</label><input id="editAmount" type="number" inputMode="decimal" min="0.01" step="0.01" value={editAmount} onChange={(event) => setEditAmount(event.target.value)} /></div>
+            <div className={styles.transactionField}><label htmlFor="editCategory">Category</label><select id="editCategory" value={editCategory} onChange={(event) => setEditCategory(event.target.value)}>{(editing.transaction.kind === "income" ? incomeCategories : expenseCategories).map((option) => <option key={option} value={option}>{option}</option>)}</select></div>
+            <div className={styles.transactionField}><label htmlFor="editDate">Date</label><input id="editDate" type="date" value={editDate} onChange={(event) => setEditDate(event.target.value)} /></div>
+            <div className={styles.transactionField}><label htmlFor="editNote">Note</label><input id="editNote" type="text" maxLength={120} value={editNote} onChange={(event) => setEditNote(event.target.value)} /></div>
+          </>}
+          <div className={styles.transactionField}><label htmlFor="editPin">Transaction PIN</label><input id="editPin" type="password" inputMode="numeric" autoComplete="off" maxLength={4} value={editPin} onChange={(event) => setEditPin(event.target.value.replace(/\D/g, "").slice(0, 4))} /></div>
+          {editError && <p className={styles.goalError} role="alert">{editError}</p>}
+          <button className={styles.primaryAction} type="submit" disabled={submitting}>{editing.mode === "delete" ? "Delete transaction" : "Save changes"}</button>
+        </form>
+      </GoalDialog>}
+      {successfulTransaction && <MockReceipt transaction={successfulTransaction} onClose={() => setReceiptId("")} />}
       {successToast && <TransactionSuccessPopup key={successToast.id} message={successToast.message}>{successfulTransaction && isSuccessfulCredit(successfulTransaction) && <strong className="funds-added-amount">+{formatAmount(successfulTransaction.amount)}</strong>}</TransactionSuccessPopup>}
     </DashboardFrame>
   );

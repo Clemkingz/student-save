@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChartNoAxesCombined, CircleDollarSign, LayoutDashboard, LockKeyhole, ReceiptText, Settings2, Target, WalletCards } from "lucide-react";
+import { ChartNoAxesCombined, CircleDollarSign, FlaskConical, LayoutDashboard, LockKeyhole, ReceiptText, Settings2, Target, WalletCards } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { createClient } from "@repo/supabase/browser";
 import { SavingsAutomation } from "./SavingsAutomationNotice";
 import styles from "../dashboard.module.css";
 
@@ -16,30 +17,35 @@ const navIcons = {
   reports: ChartNoAxesCombined,
   account: Settings2,
   funds: CircleDollarSign,
+  simulator: FlaskConical,
 };
 
-export function DashboardFrame({ email, active, children }: { email: string; active: "Dashboard" | "Add funds" | "Transactions" | "Budget/expenses" | "Savings Goals" | "Lock Savings" | "Reports & Alerts" | "Account" | "Student Verification"; children: ReactNode }) {
+const simulationMode = process.env.NEXT_PUBLIC_SIMULATION_MODE !== "false";
+
+export function DashboardFrame({ email, active, children }: { email: string; active: "Dashboard" | "Add funds" | "Transactions" | "Budget/expenses" | "Savings Goals" | "Lock Savings" | "Reports & Alerts" | "Account" | "Student Verification" | "Simulator"; children: ReactNode }) {
   const [profilePicture, setProfilePicture] = useState("");
-  const [needsStudentVerification, setNeedsStudentVerification] = useState(true);
-  const dashboardHref = `/dashboard?email=${encodeURIComponent(email)}`;
-  const budgetsHref = `/dashboard/budgets?email=${encodeURIComponent(email)}`;
-  const goalsHref = `/dashboard/savings-goals?email=${encodeURIComponent(email)}`;
-  const lockSavingsHref = `/dashboard/lock-savings?email=${encodeURIComponent(email)}`;
-  const reportsHref = `/dashboard/reports?email=${encodeURIComponent(email)}`;
-  const settingsHref = `/dashboard/settings?email=${encodeURIComponent(email)}`;
+  const [needsStudentVerification, setNeedsStudentVerification] = useState(false);
+  const dashboardHref = "/dashboard";
+  const budgetsHref = "/dashboard/budgets";
+  const goalsHref = "/dashboard/savings-goals";
+  const lockSavingsHref = "/dashboard/lock-savings";
+  const reportsHref = "/dashboard/reports";
+  const settingsHref = "/dashboard/settings";
+  const simulatorHref = "/dashboard/simulator";
   const sidebarItems = [
     { label: "Dashboard", href: dashboardHref, Icon: navIcons.dashboard },
     { label: "Budget/expenses", href: budgetsHref, Icon: navIcons.budget },
-    { label: "Transactions", href: `/dashboard/transactions?email=${encodeURIComponent(email)}`, Icon: navIcons.transactions },
+    { label: "Transactions", href: "/dashboard/transactions", Icon: navIcons.transactions },
     { label: "Savings Goals", href: goalsHref, Icon: navIcons.goals },
     { label: "Lock Savings", href: lockSavingsHref, Icon: navIcons.locks },
     { label: "Reports & Alerts", href: reportsHref, Icon: navIcons.reports },
     { label: "Account", href: settingsHref, Icon: navIcons.account },
+    ...(simulationMode ? [{ label: "Simulator", href: simulatorHref, Icon: navIcons.simulator }] : []),
   ];
   const mobileItems = [
     { label: "Home", activeLabel: "Dashboard", href: dashboardHref, Icon: navIcons.dashboard },
     { label: "Budget", activeLabel: "Budget/expenses", href: budgetsHref, Icon: navIcons.budget },
-    { label: "Spend", activeLabel: "Transactions", href: `/dashboard/transactions?email=${encodeURIComponent(email)}`, Icon: navIcons.transactions },
+    { label: "Spend", activeLabel: "Transactions", href: "/dashboard/transactions", Icon: navIcons.transactions },
     { label: "Goals", activeLabel: "Savings Goals", href: goalsHref, Icon: navIcons.goals },
     { label: "Locks", activeLabel: "Lock Savings", href: lockSavingsHref, Icon: navIcons.locks },
     { label: "Reports", activeLabel: "Reports & Alerts", href: reportsHref, Icon: navIcons.reports },
@@ -47,30 +53,20 @@ export function DashboardFrame({ email, active, children }: { email: string; act
 
   useEffect(() => {
     if (!email) return;
-    const syncProfilePicture = () => setProfilePicture(localStorage.getItem(`studentsave:profile-picture:${email}`) || "");
-    syncProfilePicture();
-    window.addEventListener("storage", syncProfilePicture);
-    window.addEventListener("studentsave:profile-picture-updated", syncProfilePicture);
-    return () => {
-      window.removeEventListener("storage", syncProfilePicture);
-      window.removeEventListener("studentsave:profile-picture-updated", syncProfilePicture);
-    };
-  }, [email]);
-
-  useEffect(() => {
-    if (!email) return;
-    const syncVerification = () => {
-      try {
-        const saved = localStorage.getItem(`studentsave:student-verification:${email}`);
-        const details = saved ? JSON.parse(saved) as { status?: string } : null;
-        setNeedsStudentVerification(details?.status !== "verified");
-      } catch {
-        setNeedsStudentVerification(true);
+    const supabase = createClient();
+    const syncProfilePicture = async () => {
+      const { data: profile } = await supabase.from("profiles").select("avatar_path").maybeSingle();
+      if (!profile?.avatar_path) {
+        setProfilePicture("");
+        return;
       }
+      const { data } = await supabase.storage.from("avatars").createSignedUrl(profile.avatar_path, 3600);
+      setProfilePicture(data?.signedUrl ?? "");
     };
-    syncVerification();
-    window.addEventListener("storage", syncVerification);
-    return () => window.removeEventListener("storage", syncVerification);
+    void syncProfilePicture();
+    void supabase.from("student_verifications").select("status").maybeSingle().then(({ data }) => setNeedsStudentVerification(data?.status !== "verified"));
+    window.addEventListener("studentsave:profile-picture-updated", syncProfilePicture);
+    return () => window.removeEventListener("studentsave:profile-picture-updated", syncProfilePicture);
   }, [email]);
 
   const profilePictureLink = (className: string | undefined) => (
@@ -94,11 +90,11 @@ export function DashboardFrame({ email, active, children }: { email: string; act
         <Link className={styles.brand} href={dashboardHref}>
           <Image src="/student-save-logo-dark.svg" width={250} height={58} alt="StudentSave" priority />
         </Link>
-        <div className={styles.mobileAccountControls}><Link className={styles.mobileSettingsLink} href={settingsHref}>Account</Link>{active !== "Dashboard" && profilePictureLink(styles.mobileProfileAvatar)}</div>
+        <div className={styles.mobileAccountControls}>{simulationMode && <Link className={styles.mobileSettingsLink} href={simulatorHref}>Simulator</Link>}<Link className={styles.mobileSettingsLink} href={settingsHref}>Account</Link>{active !== "Dashboard" && profilePictureLink(styles.mobileProfileAvatar)}</div>
       </header>
 
       <main className={styles.mainContent}>
-        <div className={styles.dashboardTopBar}>{needsStudentVerification && <aside className={styles.verificationTopMessage}><strong>Student verification needed to access dashboard</strong><Link href={`/dashboard/student-verification?email=${encodeURIComponent(email)}`}>Verify student account →</Link></aside>}{active !== "Dashboard" && profilePictureLink(styles.profileAvatar)}</div>
+        <div className={styles.dashboardTopBar}>{needsStudentVerification && <aside className={styles.verificationTopMessage}><strong>Student verification needed to access dashboard</strong><Link href="/dashboard/student-verification">Verify student account →</Link></aside>}{active !== "Dashboard" && profilePictureLink(styles.profileAvatar)}</div>
         {!needsStudentVerification && <SavingsAutomation email={email} />}
         {children}
       </main>

@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Suspense, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { createClient } from "@repo/supabase/browser";
+import { rpcMessage, toKobo, useLedger, type RpcResult } from "../../../lib/queries/ledger";
 import { DashboardFrame } from "../_components/DashboardFrame";
-import { saveFinance, withFinanceLock } from "../_components/financeStorage";
-import { getMockTransactions, localDateValue, type MockTransaction } from "../_components/mockFinance";
 import { MockReceipt } from "../_components/MockReceipt";
 import { TransactionSuccessPopup } from "../_components/TransactionSuccessPopup";
 import { useDashboardSession } from "../_components/useDashboardSession";
@@ -17,8 +17,10 @@ function money(amount: number) {
 }
 
 function AddFundsContent() {
-  const { email, wallet, ready } = useDashboardSession();
-  const [transactions, setTransactions] = useState<MockTransaction[]>([]);
+  const { userId, email, wallet, ready } = useDashboardSession();
+  const { data: ledger, refetch } = useLedger(ready ? userId : "");
+  const attemptKey = useRef("");
+  const transferKey = useRef("");
   const busy = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [amount, setAmount] = useState("");
@@ -26,23 +28,17 @@ function AddFundsContent() {
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [showBankTransferDetails, setShowBankTransferDetails] = useState(false);
-  const [successfulTransaction, setSuccessfulTransaction] = useState<MockTransaction | null>(null);
+  const [transferAmount, setTransferAmount] = useState("");
+  const [sender, setSender] = useState("");
+  const [transferError, setTransferError] = useState("");
+  const [transferNotice, setTransferNotice] = useState("");
+  const [receiptId, setReceiptId] = useState("");
   const [successToast, setSuccessToast] = useState<{ id: string; message: string } | null>(null);
 
-  const refreshFunds = useCallback(() => {
-    if (!ready || !email) return;
-    setTransactions(getMockTransactions(email));
-  }, [email, ready]);
-
-  useEffect(() => {
-    refreshFunds();
-    window.addEventListener("storage", refreshFunds);
-    return () => window.removeEventListener("storage", refreshFunds);
-  }, [refreshFunds]);
-
-  const balance = Math.max(0, transactions.reduce((sum, item) => sum + (item.type === "income" ? item.amount : -item.amount), 0));
+  const transactions = ledger?.transactions ?? [];
+  const balance = ledger?.balance ?? 0;
+  const successfulTransaction = transactions.find((item) => item.id === receiptId) ?? null;
+  const sources = transactions.length === 0 ? [...fundSources, "Opening balance"] : fundSources;
 
   async function recordFunds(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,42 +50,53 @@ function AddFundsContent() {
       return;
     }
     busy.current = true; setSubmitting(true);
-    try { await withFinanceLock(email, () => {
-    const transaction: MockTransaction = {
-      id: crypto.randomUUID(),
-      amount: Math.round(numericAmount * 100) / 100,
-      type: "income",
-      category: source,
-      date: localDateValue(),
-      note: note.trim() || "Manually recorded funds",
-      receiptNumber: `SS-${Date.now()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
-      receiptCreatedAt: new Date().toISOString(),
-    };
-    const nextTransactions = [transaction, ...getMockTransactions(email)];
-    saveFinance(email, { [`studentsave:transactions:${email}`]: nextTransactions });
-    setTransactions(nextTransactions);
+    attemptKey.current ||= crypto.randomUUID();
+    const supabase = createClient();
+    const { data, error: rpcError } = source === "Opening balance"
+      ? await supabase.rpc("set_opening_balance", { p_amount: toKobo(numericAmount), p_idempotency_key: attemptKey.current })
+      : await supabase.rpc("record_income", { p_amount: toKobo(numericAmount), p_category: source, p_occurred_on: ledger?.today ?? "", p_note: note.trim(), p_idempotency_key: attemptKey.current });
+    busy.current = false;
+    setSubmitting(false);
+    const result = data as RpcResult | null;
+    if (rpcError || !result?.ok) {
+      setError(rpcMessage(result, "Funds could not be saved. Try again."));
+      return;
+    }
+    attemptKey.current = "";
+    await refetch();
+    setSource(fundSources[0] ?? "Other");
     setAmount("");
     setNote("");
     setError("");
     setNotice("Funds added successfully.");
-    setSuccessfulTransaction(transaction);
+    setReceiptId(String(result.transaction_id));
     setSuccessToast({ id: crypto.randomUUID(), message: "Funds added successfully!" });
-    }); } catch { setError("Funds could not be saved. Check browser storage and try again."); }
-    finally { busy.current = false; setSubmitting(false); }
   }
 
-  async function copyAccountNumber() {
-    if (!wallet) return;
-    try {
-      await navigator.clipboard.writeText(wallet.accountNumber);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
+  async function simulateTransfer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const numericAmount = Number(transferAmount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setTransferError("Enter an amount greater than zero.");
+      return;
     }
+    transferKey.current ||= crypto.randomUUID();
+    const { data, error: rpcError } = await createClient().rpc("sim_incoming_transfer", { p_amount: toKobo(numericAmount), p_sender: sender.trim(), p_idempotency_key: transferKey.current });
+    const result = data as RpcResult | null;
+    if (rpcError || !result?.ok) {
+      setTransferError(rpcMessage(result, "The simulated transfer could not start. Try again."));
+      return;
+    }
+    transferKey.current = "";
+    setTransferAmount("");
+    setSender("");
+    setTransferError("");
+    setTransferNotice("Simulated transfer started. Your balance updates in a few seconds.");
+    window.setTimeout(() => void refetch(), 3500);
+    window.setTimeout(() => void refetch(), 6000);
   }
 
-  if (!ready || !wallet) {
+  if (!ready || !wallet || !ledger) {
     return <main className={styles.mainContent} aria-live="polite">Loading your account details…</main>;
   }
 
@@ -97,12 +104,12 @@ function AddFundsContent() {
     <DashboardFrame email={email} active="Add funds">
       <header className={styles.pageHeading}>
         <h1>Add funds</h1>
-        <p>Record money you’ve added to your Sabi Save account.</p>
+        <p>Add simulated money to your test wallet.</p>
       </header>
 
       <section className={styles.fundsSummary} aria-label="Wallet balance">
         <div><span>Available tracked balance</span><strong>{money(balance)}</strong></div>
-        <p>This is your StudentSave record, not a bank balance.</p>
+        <p>Test mode: this is simulated money, not a bank balance.</p>
       </section>
 
       <div className={styles.fundsContentGrid}>
@@ -110,7 +117,7 @@ function AddFundsContent() {
           <div>
             <span className={styles.fundsStep}>MANUAL ENTRY</span>
             <h2>Record funds added</h2>
-            <p>Record money added to your account manually. It will appear in your tracked balance right away.</p>
+            <p>Record money manually. It will appear in your balance right away.</p>
           </div>
           <div className={styles.transactionField}>
             <label htmlFor="fundAmount">Amount</label>
@@ -118,7 +125,7 @@ function AddFundsContent() {
           </div>
           <div className={styles.transactionField}>
             <label htmlFor="fundSource">Where did the money come from?</label>
-            <select id="fundSource" value={source} onChange={(event) => { setSource(event.target.value); setError(""); }}>{fundSources.map((item) => <option key={item}>{item}</option>)}</select>
+            <select id="fundSource" value={source} onChange={(event) => { setSource(event.target.value); setError(""); }}>{sources.map((item) => <option key={item}>{item}</option>)}</select>
           </div>
           <div className={styles.transactionField}>
             <label htmlFor="fundNote">Note (optional)</label>
@@ -127,37 +134,31 @@ function AddFundsContent() {
           {error && <p className={styles.goalError} role="alert">{error}</p>}
           {notice && <p className={styles.transactionSaved} role="status">{notice}</p>}
           <button className={styles.primaryAction} type="submit" disabled={submitting || !Number.isFinite(Number(amount)) || Number(amount) < .01}>{submitting ? "Adding funds…" : "Add funds manually"}</button>
-          <p className={styles.transactionFootnote}>This is a mock record for testing. It does not move real money.</p>
+          <p className={styles.transactionFootnote}>No real money moves.</p>
         </form>
 
-        <section className={styles.fundsPanel} aria-labelledby="bank-transfer-title">
-          <span className={styles.fundsStep}>ADD FUNDS</span>
-          <h2 id="bank-transfer-title">Bank transfer</h2>
-          <p>View your Sabi Save account details to use when setting up a transfer in your bank app.</p>
-          <button className={styles.bankTransferLauncher} type="button" onClick={() => setShowBankTransferDetails(true)}>
-            <span className={styles.bankTransferIcon} aria-hidden="true">₦</span>
-            <span><strong>View bank transfer details</strong><small>Show account number and account name</small></span>
-            <span className={styles.bankTransferArrow} aria-hidden="true">→</span>
-          </button>
-          <p className={styles.transactionFootnote}>Bank transfer setup is shown for this prototype. Transfer funds are not confirmed automatically.</p>
-          <Link className={styles.backLink} href={`/dashboard?email=${encodeURIComponent(email)}`}>← Back to dashboard</Link>
-        </section>
+        <form className={styles.fundsPanel} onSubmit={simulateTransfer} noValidate aria-labelledby="bank-transfer-title">
+          <span className={styles.fundsStep}>SIMULATED BANK</span>
+          <h2 id="bank-transfer-title">Simulated incoming transfer</h2>
+          <p>Pretend someone sent money to your test wallet. It stays pending for a moment, then settles.</p>
+          <div className={styles.fundsAccount}><span>Test wallet reference · {wallet.currency || "NGN"}</span><strong>{wallet.accountNumber}</strong></div>
+          <div className={styles.transactionField}>
+            <label htmlFor="transferAmount">Amount</label>
+            <div className={styles.transactionAmount}><span aria-hidden="true">₦</span><input id="transferAmount" type="number" inputMode="decimal" min="0.01" step="0.01" placeholder="0.00" value={transferAmount} onChange={(event) => { setTransferAmount(event.target.value); setTransferError(""); setTransferNotice(""); }} /></div>
+          </div>
+          <div className={styles.transactionField}>
+            <label htmlFor="transferSender">Sender name (optional)</label>
+            <input id="transferSender" type="text" maxLength={60} placeholder="e.g. Test Sender" value={sender} onChange={(event) => setSender(event.target.value)} />
+          </div>
+          {transferError && <p className={styles.goalError} role="alert">{transferError}</p>}
+          {transferNotice && <p className={styles.transactionSaved} role="status">{transferNotice}</p>}
+          <button className={styles.primaryAction} type="submit">Simulate transfer</button>
+          <p className={styles.transactionFootnote}>Do not send real money. This wallet cannot receive it.</p>
+          <Link className={styles.backLink} href="/dashboard">← Back to dashboard</Link>
+        </form>
       </div>
 
-      {showBankTransferDetails && <div className={styles.paymentOverlay} onClick={(event) => { if (event.target === event.currentTarget) setShowBankTransferDetails(false); }}>
-        <section className={styles.paymentDialog} role="dialog" aria-modal="true" aria-labelledby="bankTransferDialogTitle">
-          <button className={styles.paymentClose} type="button" aria-label="Close bank transfer details" onClick={() => setShowBankTransferDetails(false)}>×</button>
-          <span className={styles.fundsStep}>SABI SAVE ACCOUNT</span>
-          <h2 id="bankTransferDialogTitle">Bank transfer details</h2>
-          <p>Use these details as the destination account in your bank app.</p>
-          <div className={styles.fundsAccount}><span>Account number · {wallet.currency || "NGN"}</span><strong>{wallet.accountNumber}</strong></div>
-          <button className={styles.copyAccountButton} type="button" onClick={copyAccountNumber}>{copied ? "Copied" : "Copy account number"}</button>
-          <div className={styles.fundsAccountName}><span>Account name</span><strong>{wallet.ownerName || email}</strong></div>
-          <p className={styles.paymentMockNotice}>Transfers are not automatically verified in this prototype. Add received funds using the manual entry form.</p>
-        </section>
-      </div>}
-
-      {successfulTransaction && <MockReceipt transaction={successfulTransaction} onClose={() => setSuccessfulTransaction(null)} />}
+      {successfulTransaction && <MockReceipt transaction={successfulTransaction} onClose={() => setReceiptId("")} />}
       {successToast && <TransactionSuccessPopup key={successToast.id} message={successToast.message}>{successfulTransaction && <strong className="funds-added-amount">+{money(successfulTransaction.amount)}</strong>}</TransactionSuccessPopup>}
     </DashboardFrame>
   );

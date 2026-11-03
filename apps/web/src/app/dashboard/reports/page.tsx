@@ -1,37 +1,35 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { MockReceipt } from "../_components/MockReceipt";
 import { MoneyFlowChart } from "../_components/MoneyFlowChart";
-import { isSuccessfulCredit, getMockTransactions, type MockTransaction } from "../_components/mockFinance";
+import { isSuccessfulCredit, type MockTransaction } from "../_components/mockFinance";
+import { createClient } from "@repo/supabase/browser";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useBudgets, useCommitments, useGoals, useLedger } from "../../../lib/queries/ledger";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
 
 type Range = "month" | "30days" | "custom";
-type Budget = { id: string; category: string; amount: number; month: string; createdAt: string };
-type Goal = { id: string; name: string; targetAmount: number; savedAmount: number; createdAt: string; dueDate: string };
-type Contribution = { id: string; goalId: string; amount: number; frequency: string; date: string; createdAt: string; transactionId?: string };
-type Commitment = { id: string; planMonths: number; targetAmount: number; lockedAmount: number; startDate: string; endDate: string; description: string; createdAt: string };
 type ReportActivity = { id: string; title: string; detail: string; amount: number; date: string; kind: string; transaction?: MockTransaction };
 type ReportAlert = { id: string; title: string; detail: string; receipt?: MockTransaction };
 
-const keys = {
-  budgets: "studentsave:budgets:",
-  goals: "studentsave:savings-goals:",
-  contributions: "studentsave:savings-contributions:",
-  locks: "studentsave:lock-commitments:",
+const kindLabels: Record<string, string> = {
+  income: "Funds added",
+  opening_balance: "Funds added",
+  deposit: "Funds added",
+  goal_withdrawal: "Savings returned",
+  lock_collection: "Lock savings returned",
+  transfer_reversal: "Reversal",
+  expense: "Expense",
+  withdrawal: "Withdrawal",
+  goal_contribution: "Contribution",
+  lock_deposit: "Lock savings",
+  lock_fee: "Fee",
 };
-
-function readList<T>(key: string): T[] {
-  try {
-    const value = localStorage.getItem(key);
-    const parsed = value ? JSON.parse(value) : [];
-    return Array.isArray(parsed) ? parsed as T[] : [];
-  } catch {
-    return [];
-  }
-}
+const fundKinds = ["income", "opening_balance", "deposit"];
+const spendKinds = ["expense", "withdrawal", "lock_fee"];
 
 function money(amount: number) {
   return `₦${amount.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -47,78 +45,51 @@ function dateLabel(value: string) {
 }
 
 function ReportsContent() {
-  const { email, ready } = useDashboardSession();
-  const [transactions, setTransactions] = useState<MockTransaction[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [contributions, setContributions] = useState<Contribution[]>([]);
-  const [commitments, setCommitments] = useState<Commitment[]>([]);
+  const { userId, email, ready } = useDashboardSession();
+  const { data: ledger } = useLedger(ready ? userId : "");
+  const { data: budgets = [] } = useBudgets(ready ? userId : "");
+  const { data: goals = [] } = useGoals(ready ? userId : "");
+  const { data: commitments = [] } = useCommitments(ready ? userId : "");
+  const queryClient = useQueryClient();
+  const { data: dismissed = [] } = useQuery({
+    queryKey: ["report-dismissals", userId],
+    enabled: Boolean(ready && userId),
+    queryFn: async () => (await createClient().from("report_dismissals").select("alert_id")).data?.map((row) => row.alert_id) ?? [],
+  });
   const [range, setRange] = useState<Range>("month");
-  const [startDate, setStartDate] = useState(() => dateValue(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
-  const [endDate, setEndDate] = useState(() => dateValue(new Date()));
-  const [dismissed, setDismissed] = useState<string[]>([]);
+  const today = ledger?.today ?? dateValue(new Date());
+  const [chosenStart, setStartDate] = useState("");
+  const [chosenEnd, setEndDate] = useState("");
+  const startDate = chosenStart || `${today.slice(0, 7)}-01`;
+  const endDate = chosenEnd || today;
   const [receiptTransaction, setReceiptTransaction] = useState<MockTransaction | null>(null);
-
-  useEffect(() => {
-    if (!ready || !email) return;
-    const transactionsKey = `studentsave:transactions:${email}`;
-    const refreshTransactions = () => {
-      setTransactions(getMockTransactions(email));
-      setGoals(readList<Goal>(`${keys.goals}${email}`));
-      setContributions(readList<Contribution>(`${keys.contributions}${email}`));
-      setCommitments(readList<Commitment>(`${keys.locks}${email}`));
-    };
-    const handleStorage = (event: StorageEvent) => { if (event.key === transactionsKey || event.key === `${keys.goals}${email}` || event.key === `${keys.contributions}${email}` || event.key === `${keys.locks}${email}`) refreshTransactions(); };
-    refreshTransactions();
-    window.addEventListener("storage", handleStorage);
-    setBudgets(readList<Budget>(`${keys.budgets}${email}`));
-    setGoals(readList<Goal>(`${keys.goals}${email}`));
-    setContributions(readList<Contribution>(`${keys.contributions}${email}`));
-    setCommitments(readList<Commitment>(`${keys.locks}${email}`));
-    setDismissed(readList<string>(`studentsave:reports-dismissed:${email}`));
-    return () => window.removeEventListener("storage", handleStorage);
-  }, [email, ready]);
+  const transactions = useMemo(() => (ledger?.transactions ?? []).filter((item) => item.status !== "failed"), [ledger]);
 
   const bounds = useMemo(() => {
-    const end = new Date();
-    const start = new Date();
-    if (range === "month") start.setDate(1);
-    else if (range === "30days") start.setDate(start.getDate() - 29);
-    else {
-      const customStart = new Date(`${startDate}T00:00:00`);
-      const customEnd = new Date(`${endDate}T00:00:00`);
-      if (!Number.isNaN(customStart.getTime())) start.setTime(customStart.getTime());
-      if (!Number.isNaN(customEnd.getTime())) end.setTime(customEnd.getTime());
-    }
-    return { start: dateValue(start), end: dateValue(end) };
-  }, [endDate, range, startDate]);
+    if (range === "custom") return { start: startDate, end: endDate };
+    if (range === "month") return { start: `${today.slice(0, 7)}-01`, end: today };
+    const start = new Date(`${today}T12:00:00`);
+    start.setDate(start.getDate() - 29);
+    return { start: dateValue(start), end: today };
+  }, [endDate, range, startDate, today]);
 
-  const activities = useMemo<ReportActivity[]>(() => {
-    const items: ReportActivity[] = transactions.map((item) => ({
-      id: `transaction-${item.id}`,
+  const activities = useMemo<ReportActivity[]>(() => transactions
+    .filter((item) => item.date >= bounds.start && item.date <= bounds.end)
+    .map((item) => ({
+      id: item.id,
       title: item.category,
-      detail: `${item.type === "income" ? "Funds added" : item.category === "Withdrawal" ? "Withdrawal" : item.category === "Lock Savings" ? "Locked into commitment" : "Expense"}${item.recipientName ? ` · to ${item.recipientName}${item.recipientBank ? `, ${item.recipientBank}` : ""}` : ""}${item.note ? ` · ${item.note}` : ""}`,
+      detail: `${item.status === "pending" ? "Pending · " : ""}${item.recipientName ? `to ${item.recipientName}${item.recipientBank ? `, ${item.recipientBank}` : ""}` : ""}${item.recipientName && item.note ? " · " : ""}${item.note}`,
       amount: item.amount,
       date: item.date,
-      kind: item.type === "income" ? "Funds added" : item.category === "Withdrawal" ? "Withdrawal" : item.category === "Lock Savings" ? "Lock savings" : "Expense",
+      kind: kindLabels[item.kind] ?? item.kind,
       transaction: item,
-    }));
-    budgets.forEach((item) => items.push({ id: `budget-${item.id}`, title: `${item.category} budget`, detail: `Budget created · ${item.month}`, amount: item.amount, date: item.createdAt?.slice(0, 10) || `${item.month}-01`, kind: "Budget" }));
-    goals.forEach((item) => items.push({ id: `goal-${item.id}`, title: item.name, detail: `Savings goal created${item.dueDate ? ` · due ${dateLabel(item.dueDate)}` : ""}`, amount: item.targetAmount, date: item.createdAt?.slice(0, 10) || dateValue(new Date()), kind: "Savings goal" }));
-    contributions.forEach((item) => {
-      if (transactions.some(transaction => transaction.id === item.transactionId || transaction.id === `savings-contribution:${item.id}`)) return;
-      const goalName = goals.find((goal) => goal.id === item.goalId)?.name || "Savings goal";
-      items.push({ id: `contribution-${item.id}`, title: goalName, detail: `${item.frequency} contribution recorded`, amount: item.amount, date: item.date || item.createdAt?.slice(0, 10) || dateValue(new Date()), kind: "Contribution" });
-    });
-    commitments.forEach((item) => items.push({ id: `lock-${item.id}`, title: item.description || `${item.planMonths}-month lock`, detail: `${item.planMonths}-month commitment · ends ${dateLabel(item.endDate)}`, amount: item.lockedAmount, date: item.createdAt?.slice(0, 10) || item.startDate, kind: "Lock savings" }));
-    return items.filter((item) => item.date >= bounds.start && item.date <= bounds.end).sort((a, b) => b.date.localeCompare(a.date));
-  }, [bounds.end, bounds.start, budgets, commitments, contributions, goals, transactions]);
+    })), [bounds.end, bounds.start, transactions]);
 
-  const income = activities.filter((item) => item.kind === "Funds added").reduce((sum, item) => sum + item.amount, 0);
-  const expenses = activities.filter((item) => item.kind === "Expense" || item.kind === "Withdrawal" || item.kind === "Lock savings" && item.id.startsWith("transaction-")).reduce((sum, item) => sum + item.amount, 0);
+  const income = activities.filter((item) => item.transaction && fundKinds.includes(item.transaction.kind)).reduce((sum, item) => sum + item.amount, 0);
+  const expenses = activities.filter((item) => item.transaction && spendKinds.includes(item.transaction.kind)).reduce((sum, item) => sum + item.amount, 0);
   const spendByCategory = useMemo(() => {
     const totals = new Map<string, number>();
-    transactions.filter((item) => item.type === "expense" && item.date >= bounds.start && item.date <= bounds.end).forEach((item) => totals.set(item.category, (totals.get(item.category) || 0) + item.amount));
+    transactions.filter((item) => spendKinds.includes(item.kind) && item.date >= bounds.start && item.date <= bounds.end).forEach((item) => totals.set(item.category, (totals.get(item.category) || 0) + item.amount));
     return [...totals].map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount);
   }, [bounds.end, bounds.start, transactions]);
   const categorizedSpend = spendByCategory.reduce((sum, item) => sum + item.amount, 0);
@@ -133,26 +104,25 @@ function ReportsContent() {
         const weekTransactions = transactions.filter((item) => item.date >= bounds.start && item.date <= bounds.end && item.date.startsWith(monthPrefix) && Number(item.date.slice(8, 10)) >= firstDay && Number(item.date.slice(8, 10)) <= lastDay);
         return {
           label: `${firstDay}–${lastDay}`,
-          income: weekTransactions.filter((item) => item.type === "income").reduce((sum, item) => sum + item.amount, 0),
-          expense: weekTransactions.filter((item) => item.type === "expense").reduce((sum, item) => sum + item.amount, 0),
+          income: weekTransactions.filter((item) => fundKinds.includes(item.kind)).reduce((sum, item) => sum + item.amount, 0),
+          expense: weekTransactions.filter((item) => spendKinds.includes(item.kind)).reduce((sum, item) => sum + item.amount, 0),
         };
       });
     }
     const totals = new Map<string, { label: string; income: number; expense: number }>();
-    transactions.filter((item) => item.date >= bounds.start && item.date <= bounds.end).forEach((item) => {
+    transactions.filter((item) => item.date >= bounds.start && item.date <= bounds.end && [...fundKinds, ...spendKinds].includes(item.kind)).forEach((item) => {
       const key = item.date.slice(0, 7);
       const current = totals.get(key) || { label: new Date(`${key}-01T00:00:00`).toLocaleDateString("en", { month: "short", year: "2-digit" }), income: 0, expense: 0 };
-      current[item.type === "income" ? "income" : "expense"] += item.amount;
+      current[fundKinds.includes(item.kind) ? "income" : "expense"] += item.amount;
       totals.set(key, current);
     });
     return [...totals.values()].slice(-8);
   }, [bounds.end, bounds.start, transactions]);
 
   const alerts = useMemo<ReportAlert[]>(() => {
-    const activeMonth = dateValue(new Date()).slice(0, 7);
-    const currentBudgets = budgets.filter((item) => item.month === activeMonth);
+    const currentBudgets = budgets.filter((item) => item.month === today.slice(0, 7));
     const budgetAlerts = currentBudgets.flatMap((budget) => {
-      const spent = transactions.filter((item) => item.type === "expense" && item.category === budget.category && item.date.startsWith(activeMonth)).reduce((sum, item) => sum + item.amount, 0);
+      const { spent } = budget;
       const percent = budget.amount > 0 ? spent / budget.amount * 100 : 0;
       return percent >= 80 ? [{ id: `budget-${budget.id}`, title: `${budget.category} budget at ${Math.floor(percent)}%`, detail: `${money(spent)} of ${money(budget.amount)} spent · ${money(Math.max(0, budget.amount - spent))} remaining${percent >= 100 ? " · over budget" : ""}` }] : [];
     });
@@ -160,7 +130,7 @@ function ReportsContent() {
       const percent = goal.targetAmount > 0 ? goal.savedAmount / goal.targetAmount * 100 : 0;
       return percent > 0 ? [{ id: `goal-${goal.id}`, title: percent >= 100 ? `${goal.name} goal completed` : `${goal.name} goal at ${Math.floor(percent)}%`, detail: `${money(goal.savedAmount)} saved of ${money(goal.targetAmount)}` }] : [];
     });
-    const lockAlerts = commitments.flatMap((lock) => lock.endDate <= dateValue(new Date()) ? [{ id: `lock-${lock.id}`, title: `${lock.description || "Lock savings"} term complete`, detail: `${money(lock.lockedAmount)} commitment reached its end date` }] : []);
+    const lockAlerts = commitments.filter((lock) => !lock.withdrawnAt).flatMap((lock) => lock.endDate <= today ? [{ id: `lock-${lock.id}`, title: `${lock.description || "Lock savings"} term complete`, detail: `${money(lock.lockedAmount)} commitment reached its end date` }] : []);
     const receiptAlerts = transactions.filter((transaction) => transaction.receiptNumber && transaction.date >= bounds.start && transaction.date <= bounds.end).map((transaction) => ({
       id: `receipt-${transaction.id}`,
       title: transaction.type === "income" ? "Funds added receipt ready" : transaction.category === "Withdrawal" ? "Withdrawal receipt ready" : "Payment receipt ready",
@@ -168,15 +138,14 @@ function ReportsContent() {
       receipt: transaction,
     }));
     return [...receiptAlerts, ...budgetAlerts, ...goalAlerts, ...lockAlerts].filter((item) => !dismissed.includes(item.id));
-  }, [bounds.end, bounds.start, budgets, commitments, dismissed, goals, transactions]);
+  }, [bounds.end, bounds.start, budgets, commitments, dismissed, goals, today, transactions]);
 
-  function dismissAlert(id: string) {
-    const next = [...dismissed, id];
-    setDismissed(next);
-    localStorage.setItem(`studentsave:reports-dismissed:${email}`, JSON.stringify(next));
+  async function dismissAlert(id: string) {
+    await createClient().from("report_dismissals").insert({ user_id: userId, alert_id: id });
+    await queryClient.invalidateQueries({ queryKey: ["report-dismissals", userId] });
   }
 
-  if (!ready) return <main className={styles.mainContent} aria-live="polite">Loading reports…</main>;
+  if (!ready || !ledger) return <main className={styles.mainContent} aria-live="polite">Loading reports…</main>;
 
   return (
     <DashboardFrame email={email} active="Reports & Alerts">
@@ -194,7 +163,7 @@ function ReportsContent() {
 
       <section className={styles.reportStats} aria-label="Activity totals for selected period">
         <article className={`${styles.statCard} ${styles.balanceCard}`}><p>Funds added</p><strong className={income > 0 && activities.filter(item => item.kind === "Funds added").every(item => item.transaction && isSuccessfulCredit(item.transaction)) ? "funds-added-amount" : undefined}>{income > 0 ? "+" : ""}{money(income)}</strong><small>{activities.filter((item) => item.kind === "Funds added").length} records</small></article>
-        <article className={styles.statCard}><p>Expenses &amp; locks</p><strong>{money(expenses)}</strong><small>Includes wallet deductions</small></article>
+        <article className={styles.statCard}><p>Expenses &amp; fees</p><strong>{money(expenses)}</strong><small>Money moved into savings is not counted</small></article>
         <article className={styles.statCard}><p>Net recorded</p><strong>{money(income - expenses)}</strong><small>{activities.length} activities tracked</small></article>
       </section>
 
@@ -204,7 +173,7 @@ function ReportsContent() {
         <section className={`${styles.panel} ${styles.reportChartPanel}`}>
           <h2>Funds and expenses over time</h2>
           <p className={styles.budgetRemaining}>{bounds.start.slice(0, 7) === bounds.end.slice(0, 7) ? "Weekly totals for the selected month." : "Monthly totals for the selected date range."} Use the filters above to compare a different period.</p>
-          <MoneyFlowChart highlightIncome={transactions.filter(item => item.type === "income").every(isSuccessfulCredit)} points={moneyFlow} ariaLabel="Monthly funds added and expenses for the selected report period" />
+          <MoneyFlowChart highlightIncome={transactions.filter(item => fundKinds.includes(item.kind)).every(isSuccessfulCredit)} points={moneyFlow} ariaLabel="Monthly funds added and expenses for the selected report period" />
           {moneyFlow.length > 0 && <ul className={styles.reportFlowDetails}>{moneyFlow.map((item) => <li key={`detail-${item.label}`}><span>{item.label}</span><span>Funds {money(item.income)}</span><span>Expenses {money(item.expense)}</span><strong>Net {money(item.income - item.expense)}</strong></li>)}</ul>}
         </section>
         <section className={styles.panel}>
@@ -225,7 +194,7 @@ function ReportsContent() {
           {activities.length ? <ul className={styles.reportActivityList}>{activities.map((item) => <li key={item.id}><div><strong>{item.title}</strong><span>{item.kind} · {dateLabel(item.date)}{item.detail ? ` · ${item.detail}` : ""}{item.transaction?.receiptNumber ? ` · Receipt ${item.transaction.receiptNumber}` : ""}</span></div>{item.transaction?.receiptNumber && <button className={styles.reportReceiptButton} type="button" onClick={() => setReceiptTransaction(item.transaction || null)}>Receipt</button>}<b className={item.transaction && isSuccessfulCredit(item.transaction) ? "funds-added-amount" : undefined}>{item.kind === "Funds added" ? "+" : "−"}{money(item.amount)}</b></li>)}</ul> : <p className={styles.emptyTransactions}>No activity recorded in this date range.</p>}
         </section>
       </div>
-      <p className={styles.disclaimer}>Reports use your saved mock transactions, budgets, savings goals, contributions, and lock commitments on this device.</p>
+      <p className={styles.disclaimer}>Reports use your simulated ledger, budgets, savings goals, and lock commitments.</p>
       {receiptTransaction && <MockReceipt transaction={receiptTransaction} onClose={() => setReceiptTransaction(null)} />}
     </DashboardFrame>
   );

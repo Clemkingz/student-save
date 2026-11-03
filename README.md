@@ -47,7 +47,7 @@ Optional configuration:
 
 - `apps/web/.env.local`: set `NEXT_PUBLIC_LANDING_URL` to use an external landing deployment instead of `/landing`.
 - `apps/landing/.env.local` and `apps/admin/.env.local`: set `NEXT_PUBLIC_APP_URL` to the web origin. Defaults to http://localhost:3000 in development and https://student-saveus.vercel.app in production.
-- `apps/web/.env.local`: add `NEXT_PUBLIC_API_URL` when the backend is available. Current account and verification flows use browser storage.
+- `apps/web/.env.local`: add the Supabase URL and publishable key. See [the backend plan](docs/SUPABASE-BACKEND-PLAN.md).
 
 ## Product notes
 
@@ -59,8 +59,8 @@ Savings Goals are created without a required contribution plan. An optional dial
 
 Lock Savings can be collected at any time, including before maturity, after PIN confirmation. A 5% fee applies to every collection and is rounded to the nearest kobo. The preview shows gross savings, fee, and net payout. The ledger records the gross return and fee separately, and a collected commitment cannot be collected again.
 
-These are browser-local demo records. Contributions do not execute while the browser is closed; reliable background scheduling and real transfers require a backend. Previous manually recorded goal contributions are migrated once into the common transaction ledger so all pages show the same available balance.
+Contributions run in the database on an hourly schedule, so they continue while the app is closed. All money is simulated.
 
-Savings-goal withdrawals are available only after reaching the target and require PIN confirmation. The business logic rechecks the current goal under the finance lock, returns its full saved amount to the tracked ledger, stops its schedule, and prevents duplicate withdrawals with both a withdrawal marker and deterministic transaction ID. This is a browser-local operation; there is no server endpoint or real payout. A future backend must enforce the same checks atomically in authenticated storage.
+Savings-goal withdrawals are available only after reaching the target and require PIN confirmation. The `withdraw_goal` RPC rechecks the goal under a row lock, returns its full saved amount to the ledger, stops its schedule, and prevents duplicate withdrawals. No real payout happens.
 
 Run `pnpm lint`, `pnpm check-types`, `pnpm --filter web test`, and `pnpm build` to validate changes. The test command compiles and runs the existing Node test suite plus contribution-settings and withdrawal regression tests without additional dependencies.

@@ -1,43 +1,33 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { createClient } from "@repo/supabase/browser";
 import { AuthFrame } from "../_components/AuthFrame";
 import styles from "../auth.module.css";
 
-type Wallet = { accountNumber: string; currency: string; accountName?: string; ownerName?: string };
+type Wallet = { reference: string; currency: string; ownerName: string };
 
-function WalletCreatedContent() {
+export default function WalletCreatedPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const email = (searchParams.get("email") || "").trim().toLowerCase();
   const [wallet, setWallet] = useState<Wallet | null>(null);
 
   useEffect(() => {
-    if (!email) {
-      router.replace("/auth/sign-up");
-      return;
-    }
-
-    const savedWallet = localStorage.getItem(`studentsave:wallet:${email}`);
-    if (!savedWallet) {
-      router.replace(`/auth/wallet-setup?email=${encodeURIComponent(email)}`);
-      return;
-    }
-
-    try {
-      const parsedWallet = JSON.parse(savedWallet) as Wallet;
-      if (!parsedWallet.accountNumber) {
-        router.replace(`/auth/wallet-setup?email=${encodeURIComponent(email)}`);
+    const supabase = createClient();
+    void (async () => {
+      const [{ data: savedWallet }, { data: profile }] = await Promise.all([
+        supabase.from("wallets").select("reference, currency").maybeSingle(),
+        supabase.from("profiles").select("full_name").maybeSingle(),
+      ]);
+      if (!savedWallet) {
+        router.replace("/auth/wallet-setup");
         return;
       }
-      setWallet(parsedWallet);
-    } catch {
-      router.replace(`/auth/wallet-setup?email=${encodeURIComponent(email)}`);
-    }
-  }, [email, router]);
+      setWallet({ reference: savedWallet.reference, currency: savedWallet.currency, ownerName: profile?.full_name ?? "" });
+    })();
+  }, [router]);
 
   return (
     <AuthFrame>
@@ -49,25 +39,17 @@ function WalletCreatedContent() {
 
         {wallet && (
           <div className={styles.walletAccountSummary}>
-            <span>{wallet.accountName || "Sabi Save account"} · {wallet.currency}</span>
+            <span>Sabi Save account · {wallet.currency}</span>
             <span>Account name</span>
-            <strong className={styles.walletAccountName}>{wallet.ownerName || email}</strong>
-            <span>Account number</span>
-            <strong>{wallet.accountNumber}</strong>
+            <strong className={styles.walletAccountName}>{wallet.ownerName}</strong>
+            <span>Test wallet reference</span>
+            <strong>{wallet.reference}</strong>
           </div>
         )}
-        <Link className={styles.submitButton} href={`/dashboard?email=${encodeURIComponent(email)}`}>
+        <Link className={styles.submitButton} href="/dashboard">
           Go to dashboard
         </Link>
       </section>
     </AuthFrame>
-  );
-}
-
-export default function WalletCreatedPage() {
-  return (
-    <Suspense fallback={null}>
-      <WalletCreatedContent />
-    </Suspense>
   );
 }

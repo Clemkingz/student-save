@@ -452,3 +452,77 @@ html { scroll-behavior: smooth; scroll-padding-top: 24px; }
   .landing-page .footer-main { grid-template-columns: minmax(0, 1fr); }
   .landing-page .commitment-art { transform: scale(.85); transform-origin: center; }
 }
+
+/* Motion */
+:root { interpolate-size: allow-keywords; }
+html { scroll-padding-top: 118px; }
+.reveal-pending { opacity: 0; }
+.landing-page .site-header { position: sticky; top: var(--test-banner-height); z-index: 20; box-shadow: 0 1px 0 #ffffff14; }
+.scroll-progress { position: fixed; z-index: 21; top: var(--test-banner-height); left: 0; display: none; width: 100%; height: 3px; transform-origin: left; background: linear-gradient(90deg, var(--brand-lime), var(--primary-400)); pointer-events: none; }
+@supports (animation-timeline: scroll()) {
+  .scroll-progress { display: block; animation: progress-in linear both; animation-timeline: scroll(root); }
+}
+
+.landing-page .desktop-nav a { position: relative; padding-block: 6px; }
+.landing-page .desktop-nav a::after { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; transform: scaleX(0); transform-origin: left; border-radius: 2px; background: var(--brand-lime); content: ""; transition: transform .25s var(--landing-ease); }
+.landing-page .desktop-nav a:hover { color: var(--white); }
+.landing-page .desktop-nav a:hover::after { transform: scaleX(1); }
+.text-link { min-height: 44px; margin-top: 12px; }
+.header-cta svg, .button svg, .text-link svg { transition: transform .22s var(--landing-ease); }
+.header-cta:hover svg, .button:hover svg, .text-link:hover svg { transform: translateX(4px); }
+.mobile-menu[open] nav { animation: fade-up .24s var(--landing-ease) both; }
+
+.hero-copy { animation: none; }
+.hero-copy > * { animation: fade-up .75s var(--landing-ease) both; }
+.hero-copy > :nth-child(2) { animation-delay: .1s; }
+.hero-copy > :nth-child(3) { animation-delay: .22s; }
+.hero-copy > :nth-child(4) { animation-delay: .34s; }
+.hero-copy > :nth-child(5) { animation-delay: .46s; }
+.hero-copy h1 span { background: linear-gradient(100deg, var(--brand-lime) 42%, #fff 50%, var(--brand-lime) 58%) 100% 0 / 260% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: text-sheen 6s ease-in-out 1.4s infinite; }
+.goal-note { animation: note-pop .6s .7s var(--landing-ease) both, note-float 5s 1.3s ease-in-out infinite; }
+.record-note { animation: note-pop .6s .9s var(--landing-ease) both, note-float 5s 1.5s ease-in-out infinite; }
+.button-lime { position: relative; overflow: hidden; }
+.button-lime::after { position: absolute; top: 0; left: -60%; width: 40%; height: 100%; transform: skewX(-20deg); background: linear-gradient(90deg, transparent, #ffffff8c, transparent); content: ""; pointer-events: none; }
+.button-lime:hover::after { left: 120%; transition: left .7s ease; }
+
+.intro-mark, .feature-icon, .step-number, .faq-plus { transition: transform .25s var(--landing-ease), color .25s ease, background .25s ease; }
+.intro-item:hover .intro-mark { transform: translateY(-3px); }
+.feature-card:hover .feature-icon { transform: scale(1.08) rotate(-4deg); }
+.feature-card.revealed .budget-decoration span { transform-origin: bottom; animation: deco-grow .7s var(--landing-ease) both; }
+.feature-card.revealed .budget-decoration span:nth-child(2) { animation-delay: .1s; }
+.feature-card.revealed .budget-decoration span:nth-child(3) { animation-delay: .2s; }
+.feature-card.revealed .budget-decoration span:nth-child(4) { animation-delay: .3s; }
+.feature-card.revealed .goal-decoration-ring { animation: ring-in .8s .15s var(--landing-ease) both; }
+.feature-card.revealed .receipt-decoration { animation: receipt-drop .75s .1s var(--landing-ease) both; }
+.step-item:hover .step-number { transform: scale(1.06); color: var(--white); background: var(--primary-600); }
+.step-arrow { animation: arrow-nudge 2.6s ease-in-out infinite; }
+.commitment-lock { animation: lock-bob 4s ease-in-out infinite; }
+.commitment-sticker { animation: sticker-wiggle 5s ease-in-out infinite; }
+.leaf-one { animation: leaf-sway 7s ease-in-out infinite; }
+.leaf-two { animation: leaf-sway 7s -3.5s ease-in-out infinite; }
+.faq-item summary { transition: color .2s ease; }
+.faq-item summary:hover { color: var(--primary-700); }
+.faq-item summary:hover .faq-plus { color: var(--white); background: var(--primary-600); }
+.faq-item::details-content { block-size: 0; overflow: clip; transition: block-size .3s var(--landing-ease), content-visibility .3s allow-discrete; }
+.faq-item[open]::details-content { block-size: auto; }
+.landing-page .final-cta-card { background-size: 200% 200%; animation: cta-drift 14s ease-in-out infinite; }
+.cta-spark { animation: spark-twinkle 3.4s ease-in-out infinite; }
+.cta-spark-two { animation-delay: -1.7s; }
+
+@keyframes text-sheen { 0%, 45% { background-position: 100% 0; } 75%, 100% { background-position: 0 0; } }
+@keyframes note-pop { from { opacity: 0; scale: .8; } to { opacity: 1; scale: 1; } }
+@keyframes deco-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes ring-in { from { opacity: 0; transform: rotate(-120deg) scale(.7); } to { opacity: 1; transform: rotate(0) scale(1); } }
+@keyframes receipt-drop { from { opacity: 0; transform: translateY(-18px) rotate(2deg); } to { opacity: 1; transform: translateY(0) rotate(9deg); } }
+@keyframes arrow-nudge { 0%, 100% { translate: 0 0; } 50% { translate: 2px 3px; } }
+@keyframes lock-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+@keyframes sticker-wiggle { 0%, 86%, 100% { rotate: 0deg; } 90% { rotate: -9deg; } 95% { rotate: 7deg; } }
+@keyframes leaf-sway { 0%, 100% { translate: 0 0; } 50% { translate: 5px -5px; } }
+@keyframes cta-drift { 0%, 100% { background-position: 0 50%; } 50% { background-position: 100% 50%; } }
+@keyframes spark-twinkle { 0%, 100% { opacity: .55; scale: .9; } 50% { opacity: 1; scale: 1.12; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-progress { display: none; }
+  .hero-copy h1 span { color: var(--brand-lime); background: none; }
+  .faq-item::details-content { transition: none; }
+}

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient } from "@repo/supabase/browser";
 import { AuthFrame } from "../_components/AuthFrame";
-import { hashMockPassword } from "../_components/password";
 import styles from "../auth.module.css";
 
 type FieldName = "fullName" | "email" | "password" | "confirmPassword";
@@ -19,8 +19,19 @@ export default function SignUpPage() {
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState<FormErrors>({});
   const [notice, setNotice] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [signedInEmail, setSignedInEmail] = useState("");
+
+  useEffect(() => {
+    void createClient().auth.getUser().then(({ data }) => setSignedInEmail(data.user?.email ?? ""));
+  }, []);
+
+  async function logOut() {
+    await createClient().auth.signOut({ scope: "local" });
+    setSignedInEmail("");
+  }
 
   function updateField(field: FieldName, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -39,17 +50,36 @@ export default function SignUpPage() {
 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length === 0) {
-      const email = values.email.trim().toLowerCase();
-      const passwordHash = await hashMockPassword(values.password);
-      localStorage.setItem(`studentsave:password-hash:${email}`, passwordHash);
-      localStorage.setItem("studentsave:pending-signup", JSON.stringify({
-        fullName: values.fullName.trim(),
-        email,
-        createdAt: new Date().toISOString(),
-      }));
-      localStorage.setItem("studentsave:active-email", email);
-      router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
+      setSubmitting(true);
+      const { error } = await createClient().auth.signUp({
+        email: values.email.trim().toLowerCase(),
+        password: values.password,
+        options: { data: { full_name: values.fullName.trim() } },
+      });
+      setSubmitting(false);
+      if (error) {
+        if (error.code === "user_already_exists") setErrors({ email: "An account with this email already exists." });
+        else if (error.code === "weak_password") setErrors({ password: "Choose a stronger password." });
+        else setNotice("We couldn’t create your account. Try again.");
+        return;
+      }
+      router.push("/auth/wallet-setup");
     }
+  }
+
+  if (signedInEmail) {
+    return (
+      <AuthFrame>
+        <div className={styles.formHeading}>
+          <h1>You’re already signed in</h1>
+          <p>You’re using StudentSave as {signedInEmail}. Log out to create a new account.</p>
+        </div>
+        <div className={styles.signedInActions}>
+          <button className={styles.submitButton} type="button" onClick={() => void logOut()}>Log out and create an account</button>
+          <div className={styles.signinBox}><Link href="/dashboard">Go to my dashboard</Link></div>
+        </div>
+      </AuthFrame>
+    );
   }
 
   return (
@@ -85,7 +115,7 @@ export default function SignUpPage() {
         </div>
 
         {notice && <p className={styles.formNotice} role="status">{notice}</p>}
-        <button className={styles.submitButton} type="submit">Create account</button>
+        <button className={styles.submitButton} type="submit" disabled={submitting}>Create account</button>
       </form>
 
       <div className={styles.signinBox}>Already have an account? <Link href="/auth/sign-in">Sign in</Link></div>

@@ -3,22 +3,21 @@
 import { useState, type FormEvent } from "react";
 import { CalendarClock, HandCoins } from "lucide-react";
 import { GoalDialog } from "./GoalDialog";
-import { configureGoalContributions, contributionSettingsFor } from "./goalSettings";
-import { readFinanceList, saveFinance, withFinanceLock } from "./financeStorage";
-import { localDateValue } from "./mockFinance";
-import { verifyTransactionPin } from "./transactionPin";
-import type { ContributionMethod, Frequency, SavingsGoal } from "./savingsAutomation";
+import { createClient } from "@repo/supabase/browser";
+import { rpcMessage, toKobo, useRefreshFinance, type RpcResult, type SavingsGoal } from "../../../lib/queries/ledger";
 import styles from "../dashboard.module.css";
 
-export function ContributionSettingsDialog({ email, goal, onClose }: {
-  email: string;
+type ContributionMethod = SavingsGoal["contributionMethod"];
+type Frequency = NonNullable<SavingsGoal["autoFrequency"]>;
+
+export function ContributionSettingsDialog({ goal, onClose }: {
   goal: SavingsGoal;
   onClose: () => void;
 }) {
-  const initial = contributionSettingsFor(goal);
-  const [method, setMethod] = useState<ContributionMethod>(initial.contributionMethod);
-  const [amount, setAmount] = useState(initial.autoAmount?.toString() ?? "");
-  const [frequency, setFrequency] = useState<Frequency | "">(initial.autoFrequency ?? "");
+  const refreshFinance = useRefreshFinance();
+  const [method, setMethod] = useState<ContributionMethod>(goal.contributionMethod);
+  const [amount, setAmount] = useState(goal.autoAmount?.toString() ?? "");
+  const [frequency, setFrequency] = useState<Frequency | "">(goal.autoFrequency ?? "");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -27,25 +26,25 @@ export function ContributionSettingsDialog({ email, goal, onClose }: {
     event.preventDefault();
     if (saving) return;
     if (method === "none") { setError("Choose a method or skip for now."); return; }
+    const automatic = method === "auto";
+    if (automatic && (!Number.isFinite(Number(amount)) || toKobo(Number(amount)) < 1)) { setError("Enter an automatic contribution amount of at least ₦0.01."); return; }
+    if (automatic && !frequency) { setError("Choose a daily, weekly, or monthly frequency."); return; }
     setSaving(true); setError("");
-    try {
-      const settings = { contributionMethod: method, autoAmount: Number(amount), autoFrequency: frequency || undefined };
-      // Validate before asking for authorization; revalidate fresh records inside the lock.
-      configureGoalContributions(goal, settings, localDateValue());
-      await withFinanceLock(email, async () => {
-        if (method === "auto" && !(await verifyTransactionPin(email, pin)))
-          throw new Error("Enter your correct 4-digit transaction PIN to authorize automatic contributions.");
-        const key = `studentsave:savings-goals:${email}`;
-        const current = readFinanceList<SavingsGoal>(key);
-        const latest = current.find((item) => item.id === goal.id);
-        if (!latest) throw new Error("Savings goal not found.");
-        const updated = configureGoalContributions(latest, settings, localDateValue());
-        saveFinance(email, { [key]: current.map((item) => item.id === goal.id ? updated : item) });
-      });
-      onClose();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not save contribution settings.");
-    } finally { setSaving(false); }
+    const { data, error: rpcError } = await createClient().rpc("set_goal_contribution_settings", {
+      p_goal: goal.id,
+      p_method: method,
+      p_amount: automatic ? toKobo(Number(amount)) : 0,
+      p_frequency: frequency || "monthly",
+      p_pin: pin,
+    });
+    setSaving(false);
+    const result = data as RpcResult | null;
+    if (rpcError || !result?.ok) {
+      setError(rpcMessage(result, "Could not save contribution settings."));
+      return;
+    }
+    await refreshFinance();
+    onClose();
   }
 
   return (
@@ -71,7 +70,7 @@ export function ContributionSettingsDialog({ email, goal, onClose }: {
             <div className={styles.transactionField}><label htmlFor="autoFrequency">Frequency</label><select id="autoFrequency" required value={frequency} onChange={(event) => setFrequency(event.target.value as Frequency | "")}><option value="">Choose frequency</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div>
           </div>
           <div className={styles.transactionField}><label htmlFor="automaticPin">Transaction PIN</label><input id="automaticPin" type="password" inputMode="numeric" autoComplete="off" maxLength={4} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))} /></div>
-          <p className={styles.transactionFootnote}>Contributions start next period and use your tracked balance while StudentSave is open. Insufficient funds wait for a top-up.</p>
+          <p className={styles.transactionFootnote}>Contributions start next period and run on schedule, even when StudentSave is closed. Insufficient funds wait for a top-up.</p>
         </>}
         {error && <p className={styles.goalError} role="alert">{error}</p>}
         <button className={styles.primaryAction} type="submit" disabled={saving}>{saving ? "Saving…" : "Save contribution settings"}</button>
