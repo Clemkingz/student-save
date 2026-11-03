@@ -61,8 +61,10 @@ function LockSavingsContent() {
   const startDate = chosenStartDate || today;
   const endDate = addMonths(startDate, planMonths);
 
-  const totalTarget = commitments.reduce((sum, commitment) => sum + commitment.targetAmount, 0);
-  const totalLocked = commitments.reduce((sum, commitment) => sum + (commitment.withdrawnAt ? 0 : commitment.lockedAmount), 0);
+  // Collected locks leave the totals, so the commitment target resets once savings are collected.
+  const activeCommitments = commitments.filter((commitment) => !commitment.withdrawnAt);
+  const totalTarget = activeCommitments.reduce((sum, commitment) => sum + commitment.targetAmount, 0);
+  const totalLocked = activeCommitments.reduce((sum, commitment) => sum + commitment.lockedAmount, 0);
 
   async function withdrawCommitment(event: FormEvent<HTMLFormElement>, commitmentId: string) {
     event.preventDefault();
@@ -136,7 +138,7 @@ function LockSavingsContent() {
       {notice && <p className={styles.goalNotice} role="status">{notice}</p>}
 
       <section className={styles.lockSummary} aria-label="Commitment totals">
-        <article className={styles.statCard + " " + styles.balanceCard}><p>Commitment targets</p><strong>{money(totalTarget)}</strong><small>{commitments.length ? `${commitments.length} commitment${commitments.length === 1 ? "" : "s"}` : "No commitments yet"}</small></article>
+        <article className={styles.statCard + " " + styles.balanceCard}><p>Commitment targets</p><strong>{money(totalTarget)}</strong><small>{activeCommitments.length ? `${activeCommitments.length} active commitment${activeCommitments.length === 1 ? "" : "s"}` : commitments.length ? "No active commitments" : "No commitments yet"}</small></article>
         <article className={styles.statCard}><p>Amount locked</p><strong>{money(totalLocked)}</strong><small>Deducted from wallet balance</small></article>
         <article className={styles.statCard}><p>Available balance</p><strong>{money(walletBalance)}</strong><small>Available for other spending</small></article>
       </section>

@@ -88,7 +88,9 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
   }
 
   const visibleGoals = goalId ? goals.filter((goal) => goal.id === goalId) : goals;
-  const availableGoals = goals.filter((goal) => !goal.withdrawnAt && goal.savedAmount < goal.targetAmount);
+  const contributionGoals = visibleGoals.filter((goal) => !goal.withdrawnAt && goal.savedAmount < goal.targetAmount);
+  const [chosenGoalId, setChosenGoalId] = useState("");
+  const contributionGoal = contributionGoals.find((goal) => goal.id === chosenGoalId) ?? contributionGoals[0];
 
   if (!ready || !ledger) return <main className={styles.mainContent} aria-live="polite">Loading savings goals…</main>;
 
@@ -112,7 +114,7 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
         </div>}
         <div className={styles.goalStep}>
           {!goalId && <span className={styles.goalStepLabel}><span>02</span> Step 2</span>}
-          <button className={styles.secondaryAction} type="button" disabled={availableGoals.length === 0} onClick={() => openForm("contribution")}>Contribution</button>
+          <button className={styles.secondaryAction} type="button" disabled={contributionGoals.length === 0} onClick={() => openForm("contribution")}>Contribution</button>
         </div>
       </div>
 
@@ -142,9 +144,17 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
         </form>
       )}
 
-      <section hidden={mode !== "contribution"} aria-label="Manual contributions"><div className={styles.manualContributionGrid}>
-        {visibleGoals.filter(goal => !goal.withdrawnAt).map(goal => <ManualContribution key={goal.id} goal={goal} balance={availableBalance} />)}
-      </div></section>
+      {mode === "contribution" && contributionGoal && <section className={styles.manualContributionGrid} aria-label="Manual contribution">
+        {contributionGoals.length > 1 && <div className={`${styles.panel} ${styles.contributionPicker}`}>
+          <h2 id="contributionPickerLabel">Choose a goal</h2>
+          <div className={styles.contributionPickerList} role="radiogroup" aria-labelledby="contributionPickerLabel">
+            {contributionGoals.map((goal) => <button key={goal.id} type="button" role="radio" aria-checked={goal.id === contributionGoal.id} className={goal.id === contributionGoal.id ? styles.contributionPickerActive : styles.contributionPickerOption} onClick={() => setChosenGoalId(goal.id)}>
+              <strong>{goal.name}</strong><span>{money(goal.savedAmount)} of {money(goal.targetAmount)}</span>
+            </button>)}
+          </div>
+        </div>}
+        <ManualContribution key={contributionGoal.id} goal={contributionGoal} balance={availableBalance} />
+      </section>}
 
       {mode === null && error && <p className={styles.goalError} role="alert">{error}</p>}
       {notice && <p className={styles.goalNotice} role="status">{notice}</p>}

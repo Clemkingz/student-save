@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Suspense, useMemo, useState } from "react";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { MockReceipt } from "../_components/MockReceipt";
@@ -11,7 +12,7 @@ import { useBudgets, useCommitments, useGoals, useLedger } from "../../../lib/qu
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
 
-type Range = "month" | "30days" | "custom";
+type Range = "month" | "previous" | "30days" | "custom";
 type ReportActivity = { id: string; title: string; detail: string; amount: number; date: string; kind: string; transaction?: MockTransaction };
 type ReportAlert = { id: string; title: string; detail: string; receipt?: MockTransaction };
 
@@ -39,6 +40,19 @@ function dateValue(date: Date) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 }
 
+function shiftMonth(month: string, by: number) {
+  const date = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + by, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthEnd(month: string) {
+  return `${month}-${String(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()).padStart(2, "0")}`;
+}
+
+function monthLabel(month: string) {
+  return new Date(`${month}-01T00:00:00`).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+}
+
 function dateLabel(value: string) {
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? "Date unavailable" : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -64,14 +78,19 @@ function ReportsContent() {
   const endDate = chosenEnd || today;
   const [receiptTransaction, setReceiptTransaction] = useState<MockTransaction | null>(null);
   const transactions = useMemo(() => (ledger?.transactions ?? []).filter((item) => item.status !== "failed"), [ledger]);
+  const currentMonth = today.slice(0, 7);
+  const [chosenPastMonth, setPastMonth] = useState("");
+  const pastMonth = chosenPastMonth || shiftMonth(currentMonth, -1);
+  const oldestMonth = transactions.reduce((oldest, item) => item.date.slice(0, 7) < oldest ? item.date.slice(0, 7) : oldest, shiftMonth(currentMonth, -1));
 
   const bounds = useMemo(() => {
     if (range === "custom") return { start: startDate, end: endDate };
+    if (range === "previous") return { start: `${pastMonth}-01`, end: monthEnd(pastMonth) };
     if (range === "month") return { start: `${today.slice(0, 7)}-01`, end: today };
     const start = new Date(`${today}T12:00:00`);
     start.setDate(start.getDate() - 29);
     return { start: dateValue(start), end: today };
-  }, [endDate, range, startDate, today]);
+  }, [endDate, pastMonth, range, startDate, today]);
 
   const activities = useMemo<ReportActivity[]>(() => transactions
     .filter((item) => item.date >= bounds.start && item.date <= bounds.end)
@@ -156,8 +175,15 @@ function ReportsContent() {
 
       <div className={styles.reportFilters} role="group" aria-label="Report date range">
         <button type="button" className={range === "month" ? styles.reportFilterActive : styles.reportFilter} aria-pressed={range === "month"} onClick={() => setRange("month")}>This month</button>
+        <button type="button" className={range === "previous" ? styles.reportFilterActive : styles.reportFilter} aria-pressed={range === "previous"} onClick={() => setRange("previous")}>Previous months</button>
         <button type="button" className={range === "30days" ? styles.reportFilterActive : styles.reportFilter} aria-pressed={range === "30days"} onClick={() => setRange("30days")}>Last 30 days</button>
         <button type="button" className={range === "custom" ? styles.reportFilterActive : styles.reportFilter} aria-pressed={range === "custom"} onClick={() => setRange("custom")}>Custom</button>
+        {range === "previous" && <div className={styles.reportMonthPicker}>
+          <button type="button" className={styles.reportFilter} aria-label="Earlier month" disabled={pastMonth <= oldestMonth} onClick={() => setPastMonth(shiftMonth(pastMonth, -1))}><ChevronLeft size={18} aria-hidden="true" /></button>
+          <input type="month" aria-label="Report month" value={pastMonth} min={oldestMonth} max={shiftMonth(currentMonth, -1)} onChange={(event) => event.target.value && setPastMonth(event.target.value)} />
+          <button type="button" className={styles.reportFilter} aria-label="Later month" disabled={pastMonth >= shiftMonth(currentMonth, -1)} onClick={() => setPastMonth(shiftMonth(pastMonth, 1))}><ChevronRight size={18} aria-hidden="true" /></button>
+          <strong aria-live="polite">{monthLabel(pastMonth)}</strong>
+        </div>}
         {range === "custom" && <div className={styles.reportDateRange}><label>From <input type="date" value={startDate} max={endDate} onChange={(event) => setStartDate(event.target.value)} /></label><label>To <input type="date" value={endDate} min={startDate} onChange={(event) => setEndDate(event.target.value)} /></label></div>}
       </div>
 
