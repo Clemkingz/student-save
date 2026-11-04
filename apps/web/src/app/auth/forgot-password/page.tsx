@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
         <div className={styles.field}><label htmlFor="resetEmail">Email</label><input id="resetEmail" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => { setEmail(event.target.value); setError(""); setNotice(""); }} required /></div>
         {error && <p className={styles.fieldError} role="alert">{error}</p>}
         {notice && <p className={styles.verificationSuccess} role="status">{notice}</p>}
-        <button className={styles.submitButton} type="submit" disabled={sending}>Send reset link</button>
+        <button className={styles.submitButton} type="submit" disabled={sending} aria-busy={sending}>Send reset link</button>
       </form>
       <div className={styles.signinBox}>Remembered your password? <Link href="/auth/sign-in">Back to sign in</Link></div>
     </AuthFrame>

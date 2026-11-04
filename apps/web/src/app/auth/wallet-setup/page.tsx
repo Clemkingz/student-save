@@ -11,6 +11,7 @@ export default function WalletSetupPage() {
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [ready, setReady] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState("");
   const [pinError, setPinError] = useState("");
   const [confirmPinError, setConfirmPinError] = useState("");
@@ -44,11 +45,11 @@ export default function WalletSetupPage() {
       return;
     }
 
-    setReady(false);
+    setReady(false); setCreating(true);
     const { data, error } = await createClient().rpc("create_wallet", { p_pin: pin });
     const result = data as { ok?: boolean; code?: string } | null;
     if (error || (!result?.ok && result?.code !== "wallet_exists")) {
-      setReady(true);
+      setReady(true); setCreating(false);
       setPinError("We couldn’t create your wallet. Try again.");
       return;
     }
@@ -118,7 +119,7 @@ export default function WalletSetupPage() {
           {confirmPinError && <span className={styles.fieldError} id="confirmPin-error">{confirmPinError}</span>}
         </div>
 
-        <button className={styles.submitButton} type="submit" disabled={!ready}>Create wallet</button>
+        <button className={styles.submitButton} type="submit" disabled={!ready} aria-busy={creating}>Create wallet</button>
       </form>
 
       <p className={styles.verificationHint}>

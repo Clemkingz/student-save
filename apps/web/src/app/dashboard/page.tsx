@@ -12,6 +12,7 @@ import { SchoolStatusBar } from "./_components/SchoolStatusBar";
 import { useBudgets, useGoals, useLedger } from "../../lib/queries/ledger";
 import { useDashboardSession } from "./_components/useDashboardSession";
 import styles from "./dashboard.module.css";
+import { PageLoader } from "../PageLoader";
 
 function DashboardContent() {
   const { userId, email, wallet, ready } = useDashboardSession();
@@ -21,7 +22,7 @@ function DashboardContent() {
   const [showBalances, setShowBalances] = useState(true);
 
   if (!ready || !wallet || !ledger) {
-    return <main className={styles.mainContent} aria-live="polite">Loading your dashboard…</main>;
+    return <PageLoader message="Loading your dashboard…" />;
   }
 
   const fundsHref = "/dashboard/add-funds";

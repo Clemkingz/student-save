@@ -13,6 +13,7 @@ import { localDateValue, type MockTransaction } from "../_components/mockFinance
 import { rpcMessage, toKobo, useLedger, useRefreshFinance, type RpcResult } from "../../../lib/queries/ledger";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
+import { PageLoader } from "../../PageLoader";
 
 type TransactionType = "expense" | "income" | "withdrawal";
 type Bank = { name: string; code: string };
@@ -253,7 +254,7 @@ function TransactionContent() {
   const recentTransactions = transactions.filter((transaction) => type === "income" ? transaction.type === "income" : type === "withdrawal" ? transaction.type === "expense" && transaction.category === "Withdrawal" : transaction.type === "expense" && transaction.category !== "Withdrawal").slice(0, 8);
 
   if (!ready || !ledger) {
-    return <main className={styles.mainContent} aria-live="polite">Loading transactions…</main>;
+    return <PageLoader message="Loading transactions…" />;
   }
 
   return (
@@ -306,7 +307,7 @@ function TransactionContent() {
 
           {notice && <p className={styles.transactionSaved} role="status">{notice}</p>}
           {type === "income" && <p className={styles.transactionFootnote}>This is a test credit. It is added to your balance immediately.</p>}
-          <button className={styles.primaryAction} type="submit" disabled={submitting}>{type === "income" ? "Add funds" : type === "withdrawal" ? "Send withdrawal to account" : "Pay / save expense"}</button>
+          <button className={styles.primaryAction} type="submit" disabled={submitting} aria-busy={submitting}>{type === "income" ? "Add funds" : type === "withdrawal" ? "Send withdrawal to account" : "Pay / save expense"}</button>
         </form>
 
         <section className={styles.panel} aria-live="polite">
@@ -337,7 +338,7 @@ function TransactionContent() {
             <p>{type === "withdrawal" ? "Enter where this withdrawal should be sent." : "Enter the account receiving this payment."}</p>
             <div className={styles.paymentAmount}><span>Amount</span><strong>{formatAmount(Number(amount) || 0)}</strong><small>{type === "withdrawal" ? "Cash withdrawal" : category}</small></div>
             <div className={styles.transactionField}><label htmlFor="recipientBank">Recipient bank</label><select id="recipientBank" value={recipientBankCode} onChange={(event) => { setRecipientBankCode(event.target.value); setRecipientName(""); setAccountResolved(false); setPaymentError(""); setResolutionError(""); }}><option value="">Select bank</option>{banks.map((bank) => <option key={bank.code} value={bank.code}>{bank.name}</option>)}</select></div>
-            <div className={styles.transactionField}><label htmlFor="recipientAccountNumber">Recipient account number</label><input id="recipientAccountNumber" inputMode="numeric" autoComplete="off" maxLength={10} value={recipientAccountNumber} onChange={(event) => { setRecipientAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10)); setRecipientName(""); setAccountResolved(false); setResolutionError(""); setPaymentError(""); }} placeholder="10-digit account number" /><button className={styles.mockResolveButton} type="button" onClick={resolveRecipientAccount} disabled={resolvingAccount || !recipientBankCode || recipientAccountNumber.length !== 10}>{resolvingAccount ? "Looking up account…" : accountResolved ? "Account found" : "Find account name"}</button>{resolutionError && <span className={styles.transactionError} role="alert">{resolutionError}</span>}</div>
+            <div className={styles.transactionField}><label htmlFor="recipientAccountNumber">Recipient account number</label><input id="recipientAccountNumber" inputMode="numeric" autoComplete="off" maxLength={10} value={recipientAccountNumber} onChange={(event) => { setRecipientAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10)); setRecipientName(""); setAccountResolved(false); setResolutionError(""); setPaymentError(""); }} placeholder="10-digit account number" /><button className={styles.mockResolveButton} type="button" onClick={resolveRecipientAccount} disabled={resolvingAccount || !recipientBankCode || recipientAccountNumber.length !== 10} aria-busy={resolvingAccount}>{resolvingAccount ? "Looking up account…" : accountResolved ? "Account found" : "Find account name"}</button>{resolutionError && <span className={styles.transactionError} role="alert">{resolutionError}</span>}</div>
             <div className={styles.transactionField}><label htmlFor="recipientName">Recipient account name</label><input id="recipientName" autoComplete="off" readOnly value={recipientName} placeholder="Find the account name" /><span className={styles.transactionFootnote}>Recipient details are simulated for testing.</span></div>
             {paymentError && <p className={styles.goalError} role="alert">{paymentError}</p>}
             <p className={styles.paymentMockNotice}>Test mode: this goes through a simulated bank. No real money moves.</p>
@@ -361,7 +362,7 @@ function TransactionContent() {
             </div>
             <div className={styles.transactionField}><label htmlFor="transactionPin">Transaction PIN</label><div className={styles.secretInputWrap}><input id="transactionPin" type={showPin ? "text" : "password"} inputMode="numeric" autoComplete="off" maxLength={4} autoFocus value={transactionPin} onChange={(event) => { setTransactionPin(event.target.value.replace(/\D/g, "").slice(0, 4)); setPaymentError(""); }} placeholder="Enter your 4-digit PIN" /><button type="button" className={styles.secretToggle} aria-label={showPin ? "Hide PIN" : "Show PIN"} onClick={() => setShowPin((visible) => !visible)}>{showPin ? <EyeOff size={18} /> : <Eye size={18} />}</button></div><span className={styles.transactionFootnote}>Use the personal PIN you created when setting up your wallet.</span></div>
             {paymentError && <p className={styles.goalError} role="alert">{paymentError}</p>}
-            <button className={styles.primaryAction} type="submit" disabled={submitting}>Confirm {type === "withdrawal" ? "withdrawal" : "payment"}</button>
+            <button className={styles.primaryAction} type="submit" disabled={submitting} aria-busy={submitting}>Confirm {type === "withdrawal" ? "withdrawal" : "payment"}</button>
           </form>
         </div>
       )}
@@ -375,7 +376,7 @@ function TransactionContent() {
           </>}
           <div className={styles.transactionField}><label htmlFor="editPin">Transaction PIN</label><input id="editPin" type="password" inputMode="numeric" autoComplete="off" maxLength={4} value={editPin} onChange={(event) => setEditPin(event.target.value.replace(/\D/g, "").slice(0, 4))} /></div>
           {editError && <p className={styles.goalError} role="alert">{editError}</p>}
-          <button className={styles.primaryAction} type="submit" disabled={submitting}>{editing.mode === "delete" ? "Delete transaction" : "Save changes"}</button>
+          <button className={styles.primaryAction} type="submit" disabled={submitting} aria-busy={submitting}>{editing.mode === "delete" ? "Delete transaction" : "Save changes"}</button>
         </form>
       </GoalDialog>}
       {successfulTransaction && <MockReceipt transaction={successfulTransaction} onClose={() => setReceiptId("")} />}

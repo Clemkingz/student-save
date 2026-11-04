@@ -161,6 +161,3 @@
   .submitButton:hover, .submitButton:active:not(:disabled) { transform: none; }
 }
 
-.signedInActions { display: grid; gap: 4px; }
-.signedInActions .submitButton { width: 100%; padding-inline: 16px; }
-.signedInActions .signinBox { text-align: center; }

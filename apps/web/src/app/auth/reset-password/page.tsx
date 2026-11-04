@@ -48,7 +48,7 @@ export default function ResetPasswordPage() {
         <div className={styles.field}><label htmlFor="confirmPassword">Confirm new password</label><input id="confirmPassword" type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(event) => { setConfirmPassword(event.target.value); setError(""); }} required /></div>
         {error && <p className={styles.fieldError} role="alert">{error}</p>}
         {notice && <p className={styles.verificationSuccess} role="status">{notice}</p>}
-        <button className={styles.submitButton} type="submit" disabled={saving}>Reset password</button>
+        <button className={styles.submitButton} type="submit" disabled={saving} aria-busy={saving}>Reset password</button>
       </form>
       <div className={styles.signinBox}>Need a new link? <Link href="/auth/forgot-password">Request one</Link></div>
     </AuthFrame>

@@ -49,7 +49,7 @@ export function GoalWithdrawalButton({ goal }: { goal: SavingsGoal }) {
           <div className={styles.paymentAmount}><span>Amount to withdraw</span><strong>{money(goal.savedAmount)}</strong></div>
           <div className={styles.transactionField}><label htmlFor={pinId}>Transaction PIN</label><input id={pinId} type="password" inputMode="numeric" autoComplete="off" maxLength={4} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 4))} /></div>
           {error && <p className={styles.goalError} role="alert">{error}</p>}
-          <button className={styles.primaryAction} type="submit" disabled={saving}>{saving ? "Withdrawing…" : "Confirm"}</button>
+          <button className={styles.primaryAction} type="submit" disabled={saving} aria-busy={saving}>{saving ? "Withdrawing…" : "Confirm"}</button>
           <button className={styles.secondaryAction} type="button" onClick={() => setOpen(false)}>Cancel</button>
         </form>
       </GoalDialog>}

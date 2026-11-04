@@ -51,7 +51,7 @@ export default function AdminSignInPage() {
           <input id="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
         </div>
         {notice && <p className={styles.formNotice} role="status">{notice}</p>}
-        <button className={styles.submitButton} type="submit" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
+        <button className={styles.submitButton} type="submit" disabled={submitting} aria-busy={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
       </form>
       <div className={styles.signinBox}>Are you a student? <Link href="/auth/sign-in">Student sign in</Link></div>
     </AuthFrame>

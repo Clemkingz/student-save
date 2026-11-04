@@ -28,11 +28,6 @@ export default function SignUpPage() {
     void createClient().auth.getUser().then(({ data }) => setSignedInEmail(data.user?.email ?? ""));
   }, []);
 
-  async function logOut() {
-    await createClient().auth.signOut({ scope: "local" });
-    setSignedInEmail("");
-  }
-
   function updateField(field: FieldName, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
@@ -51,7 +46,9 @@ export default function SignUpPage() {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length === 0) {
       setSubmitting(true);
-      const { error } = await createClient().auth.signUp({
+      const supabase = createClient();
+      if (signedInEmail) await supabase.auth.signOut({ scope: "local" });
+      const { data, error } = await supabase.auth.signUp({
         email: values.email.trim().toLowerCase(),
         password: values.password,
         options: { data: { full_name: values.fullName.trim() } },
@@ -63,23 +60,17 @@ export default function SignUpPage() {
         else setNotice("We couldn’t create your account. Try again.");
         return;
       }
+      // With email confirmation on, Supabase hides existing accounts behind a user with no identities.
+      if (data.user?.identities?.length === 0) {
+        setErrors({ email: "An account with this email already exists." });
+        return;
+      }
+      if (!data.session) {
+        setNotice("Check your email to confirm your account, then sign in.");
+        return;
+      }
       router.push("/auth/wallet-setup");
     }
-  }
-
-  if (signedInEmail) {
-    return (
-      <AuthFrame>
-        <div className={styles.formHeading}>
-          <h1>You’re already signed in</h1>
-          <p>You’re using StudentSave as {signedInEmail}. Log out to create a new account.</p>
-        </div>
-        <div className={styles.signedInActions}>
-          <button className={styles.submitButton} type="button" onClick={() => void logOut()}>Log out and create an account</button>
-          <div className={styles.signinBox}><Link href="/dashboard">Go to my dashboard</Link></div>
-        </div>
-      </AuthFrame>
-    );
   }
 
   return (
@@ -88,6 +79,7 @@ export default function SignUpPage() {
         <h1>Create your account</h1>
         <p>Track income, expenses and savings in one place.</p>
       </div>
+      {signedInEmail && <p className={styles.formNotice} role="status">You’re signed in as {signedInEmail}. Creating a new account will sign you out of it.</p>}
 
       <form className={styles.formCard} onSubmit={handleSubmit} noValidate>
         <div className={styles.field}>
@@ -115,7 +107,7 @@ export default function SignUpPage() {
         </div>
 
         {notice && <p className={styles.formNotice} role="status">{notice}</p>}
-        <button className={styles.submitButton} type="submit" disabled={submitting}>Create account</button>
+        <button className={styles.submitButton} type="submit" disabled={submitting} aria-busy={submitting}>Create account</button>
       </form>
 
       <div className={styles.signinBox}>Already have an account? <Link href="/auth/sign-in">Sign in</Link></div>

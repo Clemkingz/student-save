@@ -25,6 +25,7 @@ import {
 const spendingBars = [42, 58, 46, 72, 52, 66, 86, 61, 75, 54, 96, 69];
 const appOrigin = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === "development" ? "http://localhost:3000" : "https://student-saveus.vercel.app");
 const appSignUpPath = `${appOrigin.replace(/\/$/, "")}/auth/sign-up`;
+const appSignInPath = `${appOrigin.replace(/\/$/, "")}/auth/sign-in`;
 
 const faqs = [
   {
@@ -127,6 +128,7 @@ export default function HomePage() {
             <Link href="#how-it-works">How it works</Link>
             <Link href="#faq">FAQs</Link>
           </nav>
+          <Link className="header-signin" href={appSignInPath}>Sign in</Link>
           <Link className="header-cta" href={appSignUpPath}>Create account <ArrowRight size={16} aria-hidden="true" /></Link>
           <details className="mobile-menu">
             <summary aria-label="Open navigation"><Menu size={22} aria-hidden="true" /></summary>
@@ -134,6 +136,7 @@ export default function HomePage() {
               <Link href="#features">What you can do</Link>
               <Link href="#how-it-works">How it works</Link>
               <Link href="#faq">FAQs</Link>
+              <Link href={appSignInPath}>Sign in</Link>
               <Link href={appSignUpPath}>Create account</Link>
             </nav>
           </details>

@@ -73,7 +73,7 @@ export function ContributionSettingsDialog({ goal, onClose }: {
           <p className={styles.transactionFootnote}>Contributions start next period and run on schedule, even when StudentSave is closed. Insufficient funds wait for a top-up.</p>
         </>}
         {error && <p className={styles.goalError} role="alert">{error}</p>}
-        <button className={styles.primaryAction} type="submit" disabled={saving}>{saving ? "Saving…" : "Save contribution settings"}</button>
+        <button className={styles.primaryAction} type="submit" disabled={saving} aria-busy={saving}>{saving ? "Saving…" : "Save contribution settings"}</button>
         <button className={styles.secondaryAction} type="button" onClick={onClose}>Skip for now</button>
       </form>
     </GoalDialog>

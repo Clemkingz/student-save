@@ -8,6 +8,7 @@ import { rpcMessage, toKobo, useBudgets, useLedger, type RpcResult } from "../..
 import { isSuccessfulCredit } from "../_components/mockFinance";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
+import { PageLoader } from "../../PageLoader";
 
 const categories = ["Food", "Transport", "Travelling", "Textbook", "Laptop", "Accommodation", "Utilities", "Healthcare", "Entertainment", "Data", "Other"];
 
@@ -73,7 +74,7 @@ function BudgetsContent() {
     setShowForm(false);
   }
 
-  if (!ready || !ledger) return <main className={styles.mainContent} aria-live="polite">Loading budgets…</main>;
+  if (!ready || !ledger) return <PageLoader message="Loading budgets…" />;
 
   const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleDateString("en-GB", { month: "long" });
 
@@ -113,7 +114,7 @@ function BudgetsContent() {
           </div>
           <p className={styles.budgetLimitHint}>Your total monthly budgets can’t exceed {money(budgetCeiling)} (the lower of your income and tracked balance). {money(remainingToBudget)} remains available.</p>
           {error && <p className={styles.budgetError} id="budgetAmount-error" role="alert">{error}</p>}
-          <button className={styles.primaryAction} type="submit" disabled={saving}>Save budget</button>
+          <button className={styles.primaryAction} type="submit" disabled={saving} aria-busy={saving}>Save budget</button>
         </form>
       )}
 

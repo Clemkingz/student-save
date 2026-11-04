@@ -9,6 +9,7 @@ import { AnimatedPadlock } from "../_components/AnimatedPadlock";
 import { TransactionSuccessPopup } from "../_components/TransactionSuccessPopup";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
+import { PageLoader } from "../../PageLoader";
 
 const lockPlans = [1, 2, 3, 6, 12];
 
@@ -124,7 +125,7 @@ function LockSavingsContent() {
     setSuccessToast({ id: crypto.randomUUID(), message: "Lock confirmed", lock: true });
   }
 
-  if (!ready || !ledger) return <main className={styles.mainContent} aria-live="polite">Loading lock savings…</main>;
+  if (!ready || !ledger) return <PageLoader message="Loading lock savings…" />;
 
   return (
     <DashboardFrame email={email} active="Lock Savings">
@@ -176,7 +177,7 @@ function LockSavingsContent() {
             <span className={styles.transactionFootnote}>Use the personal PIN you created when setting up your wallet.</span>
           </div>
           {error && <p className={styles.goalError} role="alert">{error}</p>}
-          <button className={styles.primaryAction} type="submit" disabled={saving}>Lock savings</button>
+          <button className={styles.primaryAction} type="submit" disabled={saving} aria-busy={saving}>Lock savings</button>
         </form>
 
         <section className={styles.panel + " " + styles.commitmentPanel}>
@@ -202,7 +203,7 @@ function LockSavingsContent() {
                       <label htmlFor={`collection-pin-${commitment.id}`}>Transaction PIN</label>
                       <input id={`collection-pin-${commitment.id}`} type="password" inputMode="numeric" maxLength={4} autoComplete="off" value={collectionPin} onChange={event => setCollectionPin(event.target.value.replace(/\D/g, "").slice(0, 4))} />
                       {error && <p className={styles.goalError} role="alert">{error}</p>}
-                      <button className={styles.primaryAction} type="submit" disabled={saving}>{saving ? "Collecting…" : `Confirm · receive ${money(net)}`}</button>
+                      <button className={styles.primaryAction} type="submit" disabled={saving} aria-busy={saving}>{saving ? "Collecting…" : `Confirm · receive ${money(net)}`}</button>
                       <button className={styles.secondaryAction} type="button" disabled={saving} onClick={() => setCollectionId("")}>Cancel</button>
                     </form>}
                   </article>

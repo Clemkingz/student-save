@@ -8,6 +8,7 @@ import { DashboardFrame } from "../_components/DashboardFrame";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import { UniversitySelect } from "../_components/UniversitySelect";
 import styles from "../dashboard.module.css";
+import { PageLoader } from "../../PageLoader";
 
 type VerificationStatus = "pending" | "verified" | "rejected" | "not-submitted";
 
@@ -225,7 +226,7 @@ function StudentVerificationContent() {
     setCheckResult(latest === "pending" ? `Still waiting for admin review. Checked at ${new Date().toLocaleTimeString("en-NG", { timeStyle: "short" })}.` : latest ? "" : "We couldn’t check your status. Reload this page and try again.");
   }
 
-  if (!ready) return <main className={styles.mainContent} aria-live="polite">Loading student verification…</main>;
+  if (!ready) return <PageLoader message="Loading student verification…" />;
 
   return (
     <DashboardFrame email={email} active="Student Verification">
@@ -272,7 +273,7 @@ function StudentVerificationContent() {
 
           {error && <p className={styles.goalError} role="alert">{error}</p>}
           {notice && <p className={styles.goalNotice} role="status">{notice}</p>}
-          <button className={styles.primaryAction} type="submit" disabled={submitting}>Upload student details</button>
+          <button className={styles.primaryAction} type="submit" disabled={submitting} aria-busy={submitting}>Upload student details</button>
           <p className={styles.studentVerificationNote}>Test mode: use made-up details. Nothing is sent to your school.</p>
         </form>
       </div>

@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBudgets, useCommitments, useGoals, useLedger } from "../../../lib/queries/ledger";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
+import { PageLoader } from "../../PageLoader";
 
 type Range = "month" | "previous" | "30days" | "custom";
 type ReportActivity = { id: string; title: string; detail: string; amount: number; date: string; kind: string; transaction?: MockTransaction };
@@ -164,7 +165,7 @@ function ReportsContent() {
     await queryClient.invalidateQueries({ queryKey: ["report-dismissals", userId] });
   }
 
-  if (!ready || !ledger) return <main className={styles.mainContent} aria-live="polite">Loading reports…</main>;
+  if (!ready || !ledger) return <PageLoader message="Loading reports…" />;
 
   return (
     <DashboardFrame email={email} active="Reports & Alerts">

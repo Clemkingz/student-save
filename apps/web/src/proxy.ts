@@ -2,7 +2,6 @@ import { createClient } from "@repo/supabase/server";
 import { adminSessionCookie } from "@repo/supabase/session";
 import { NextResponse, type NextRequest } from "next/server";
 
-const signedOutPages = ["/auth/sign-in"];
 const signedInPrefixes = ["/dashboard", "/auth/wallet-setup", "/auth/wallet-created"];
 const adminSignIn = "/admin/sign-in";
 
@@ -15,7 +14,7 @@ function redirectTo(request: NextRequest, pathname: string, response: NextRespon
   return redirect;
 }
 
-// Refreshes the session and sends visitors to the right side of sign-in. RLS and RPCs are the real guard.
+// Refreshes the session and sends signed-out visitors to sign-in. Signed-in users may still open sign-in to switch accounts. RLS and RPCs are the real guard.
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const { pathname } = request.nextUrl;
@@ -39,9 +38,6 @@ export async function proxy(request: NextRequest) {
   }
   if (!signedIn && signedInPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     return redirectTo(request, "/auth/sign-in", response);
-  }
-  if (signedIn && signedOutPages.includes(pathname)) {
-    return redirectTo(request, "/dashboard", response);
   }
   return response;
 }

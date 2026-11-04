@@ -8,6 +8,7 @@ import { DashboardFrame } from "../_components/DashboardFrame";
 import { GoalDialog } from "../_components/GoalDialog";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
+import { PageLoader } from "../../PageLoader";
 
 type Notifications = { inApp: boolean; email: boolean; push: boolean };
 const defaultNotifications: Notifications = { inApp: true, email: true, push: false };
@@ -27,6 +28,7 @@ function SettingsContent() {
   const [showPinForm, setShowPinForm] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [busyForm, setBusyForm] = useState("");
   const [pinPassword, setPinPassword] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -40,6 +42,15 @@ function SettingsContent() {
       if (data) setNotifications({ inApp: data.in_app, email: data.email, push: data.push });
     });
   }, [email, ready, wallet]);
+
+  // Marks one form busy while its request runs, so its button shows a spinner and cannot double-submit.
+  function whileBusy(form: string, action: (event: FormEvent<HTMLFormElement>) => Promise<void>) {
+    return async (event: FormEvent<HTMLFormElement>) => {
+      if (busyForm) { event.preventDefault(); return; }
+      setBusyForm(form);
+      try { await action(event); } finally { setBusyForm(""); }
+    };
+  }
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -156,7 +167,7 @@ function SettingsContent() {
     setNotice("Your data export has been downloaded.");
   }
 
-  if (!ready) return <main className={styles.mainContent} aria-live="polite">Loading settings…</main>;
+  if (!ready) return <PageLoader message="Loading settings…" />;
 
   return (
     <DashboardFrame email={email} active="Account">
@@ -169,10 +180,10 @@ function SettingsContent() {
         <section className={styles.panel}>
           <h2>Profile</h2>
           {editingProfile ? (
-            <form className={styles.settingsProfileForm} onSubmit={saveProfile}>
+            <form className={styles.settingsProfileForm} onSubmit={whileBusy("profile", saveProfile)}>
               <label htmlFor="profileName">Account name</label>
               <input id="profileName" value={nameDraft} maxLength={80} onChange={(event) => setNameDraft(event.target.value)} required />
-              <div className={styles.settingsInlineActions}><button className={styles.primaryAction} type="submit">Save profile</button><button className={styles.secondaryAction} type="button" onClick={() => setEditingProfile(false)}>Cancel</button></div>
+              <div className={styles.settingsInlineActions}><button className={styles.primaryAction} type="submit" disabled={busyForm === "profile"} aria-busy={busyForm === "profile"}>Save profile</button><button className={styles.secondaryAction} type="button" onClick={() => setEditingProfile(false)}>Cancel</button></div>
             </form>
           ) : (
             <div className={styles.settingsRows}>
@@ -205,21 +216,21 @@ function SettingsContent() {
         <button className={styles.secondaryAction} type="button" onClick={exportData}>Export my data</button>
       </div>
 
-      {showPasswordForm && <form className={`${styles.panel} ${styles.settingsPasswordForm}`} onSubmit={changePassword}>
+      {showPasswordForm && <form className={`${styles.panel} ${styles.settingsPasswordForm}`} onSubmit={whileBusy("password", changePassword)}>
         <h2>Change password</h2>
         <div className={styles.transactionField}><label htmlFor="oldPassword">Current password</label><input id="oldPassword" type="password" autoComplete="current-password" value={oldPassword} onChange={(event) => { setOldPassword(event.target.value); setPasswordError(""); }} required /></div>
         <div className={styles.transactionField}><label htmlFor="newPassword">New password</label><input id="newPassword" type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={(event) => { setNewPassword(event.target.value); setPasswordError(""); }} required /></div>
         <div className={styles.transactionField}><label htmlFor="confirmNewPassword">Confirm new password</label><input id="confirmNewPassword" type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(event) => { setConfirmPassword(event.target.value); setPasswordError(""); }} required /></div>
         {passwordError && <p className={styles.goalError} role="alert">{passwordError}</p>}
-        <button className={styles.primaryAction} type="submit">Save new password</button>
+        <button className={styles.primaryAction} type="submit" disabled={busyForm === "password"} aria-busy={busyForm === "password"}>Save new password</button>
       </form>}
-      {showPinForm && <form className={`${styles.panel} ${styles.settingsPasswordForm}`} onSubmit={resetPin}>
+      {showPinForm && <form className={`${styles.panel} ${styles.settingsPasswordForm}`} onSubmit={whileBusy("pin", resetPin)}>
         <h2>Reset PIN</h2>
         <div className={styles.transactionField}><label htmlFor="pinPassword">Account password</label><input id="pinPassword" type="password" autoComplete="current-password" value={pinPassword} onChange={(event) => { setPinPassword(event.target.value); setPinError(""); }} required /></div>
         <div className={styles.transactionField}><label htmlFor="newPin">New PIN</label><input id="newPin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} value={newPin} onChange={(event) => { setNewPin(event.target.value.replace(/\D/g, "")); setPinError(""); }} required /></div>
         <div className={styles.transactionField}><label htmlFor="confirmNewPin">Confirm new PIN</label><input id="confirmNewPin" type="password" inputMode="numeric" autoComplete="new-password" maxLength={4} value={confirmPin} onChange={(event) => { setConfirmPin(event.target.value.replace(/\D/g, "")); setPinError(""); }} required /></div>
         {pinError && <p className={styles.goalError} role="alert">{pinError}</p>}
-        <button className={styles.primaryAction} type="submit">Save new PIN</button>
+        <button className={styles.primaryAction} type="submit" disabled={busyForm === "pin"} aria-busy={busyForm === "pin"}>Save new PIN</button>
       </form>}
       {notice && <p className={styles.goalNotice} role="status">{notice}</p>}
 
@@ -235,7 +246,7 @@ function SettingsContent() {
         <p>This removes your wallet, records, and uploaded files. It cannot be undone.</p>
         <div className={styles.confirmActions}>
           <button className={styles.secondaryAction} type="button" disabled={deleting} onClick={() => setConfirmingDelete(false)}>Keep my account</button>
-          <button className={styles.dangerAction} type="button" disabled={deleting} onClick={() => void deleteAccount()}>{deleting ? "Deleting…" : "Yes, delete everything"}</button>
+          <button className={styles.dangerAction} type="button" disabled={deleting} aria-busy={deleting} onClick={() => void deleteAccount()}>{deleting ? "Deleting…" : "Yes, delete everything"}</button>
         </div>
       </GoalDialog>}
     </DashboardFrame>

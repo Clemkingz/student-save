@@ -9,6 +9,7 @@ import { MockReceipt } from "../_components/MockReceipt";
 import { TransactionSuccessPopup } from "../_components/TransactionSuccessPopup";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
+import { PageLoader } from "../../PageLoader";
 
 const fundSources = ["Allowance", "Scholarship", "Gift", "Salary", "Freelance", "Other"];
 
@@ -23,6 +24,7 @@ function AddFundsContent() {
   const transferKey = useRef("");
   const busy = useRef(false);
   const [submitting, setSubmitting] = useState(false);
+  const [transferring, setTransferring] = useState(false);
   const [amount, setAmount] = useState("");
   const [source, setSource] = useState(fundSources[0] ?? "Other");
   const [note, setNote] = useState("");
@@ -80,8 +82,11 @@ function AddFundsContent() {
       setTransferError("Enter an amount greater than zero.");
       return;
     }
+    if (transferring) return;
+    setTransferring(true);
     transferKey.current ||= crypto.randomUUID();
     const { data, error: rpcError } = await createClient().rpc("sim_incoming_transfer", { p_amount: toKobo(numericAmount), p_sender: sender.trim(), p_idempotency_key: transferKey.current });
+    setTransferring(false);
     const result = data as RpcResult | null;
     if (rpcError || !result?.ok) {
       setTransferError(rpcMessage(result, "The simulated transfer could not start. Try again."));
@@ -97,7 +102,7 @@ function AddFundsContent() {
   }
 
   if (!ready || !wallet || !ledger) {
-    return <main className={styles.mainContent} aria-live="polite">Loading your account details…</main>;
+    return <PageLoader message="Loading your account details…" />;
   }
 
   return (
@@ -133,7 +138,7 @@ function AddFundsContent() {
           </div>
           {error && <p className={styles.goalError} role="alert">{error}</p>}
           {notice && <p className={styles.transactionSaved} role="status">{notice}</p>}
-          <button className={styles.primaryAction} type="submit" disabled={submitting || !Number.isFinite(Number(amount)) || Number(amount) < .01}>{submitting ? "Adding funds…" : "Add funds manually"}</button>
+          <button className={styles.primaryAction} type="submit" disabled={submitting || !Number.isFinite(Number(amount)) || Number(amount) < .01} aria-busy={submitting}>{submitting ? "Adding funds…" : "Add funds manually"}</button>
           <p className={styles.transactionFootnote}>No real money moves.</p>
         </form>
 
@@ -152,7 +157,7 @@ function AddFundsContent() {
           </div>
           {transferError && <p className={styles.goalError} role="alert">{transferError}</p>}
           {transferNotice && <p className={styles.transactionSaved} role="status">{transferNotice}</p>}
-          <button className={styles.primaryAction} type="submit">Simulate transfer</button>
+          <button className={styles.primaryAction} type="submit" disabled={transferring} aria-busy={transferring}>Simulate transfer</button>
           <p className={styles.transactionFootnote}>Do not send real money. This wallet cannot receive it.</p>
           <Link className={styles.backLink} href="/dashboard">← Back to dashboard</Link>
         </form>

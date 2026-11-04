@@ -53,7 +53,7 @@ export default function SignInPage() {
           <div className={styles.secretField}><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Your password" required value={password} onChange={(event) => { setPassword(event.target.value); setNotice(""); }} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
         </div>
         {notice && <p className={styles.formNotice} role="status">{notice}</p>}
-        <button className={styles.submitButton} type="submit" disabled={submitting}>Sign in</button>
+        <button className={styles.submitButton} type="submit" disabled={submitting} aria-busy={submitting}>Sign in</button>
       </form>
       <div className={styles.signinBox}>New to StudentSave? <Link href="/auth/sign-up">Create an account</Link></div>
     </AuthFrame>

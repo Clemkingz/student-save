@@ -11,6 +11,9 @@
 .desktop-nav a { font-size: 13px; font-weight: 600; }
 .desktop-nav a:hover, .footer-links a:hover { color: var(--primary-600); }
 .header-cta { display: inline-flex; min-height: 43px; align-items: center; gap: 9px; padding: 0 16px; border-radius: 10px; color: var(--white); background: var(--primary-600); font-size: 13px; font-weight: 700; text-decoration: none; transition: background .18s ease, transform .18s ease; }
+.header-signin { display: inline-flex; min-height: 43px; align-items: center; padding: 0 16px; border: 1px solid currentColor; border-radius: 10px; color: var(--primary-700); font-size: 13px; font-weight: 700; text-decoration: none; transition: background .18s ease, color .18s ease; }
+.header-signin:hover { background: var(--primary-100); }
+.header-signin + .header-cta { margin-left: -16px; }
 .header-cta:hover { transform: translateY(-1px); background: var(--primary-700); }
 .mobile-menu { display: none; position: relative; }
 .mobile-menu summary { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid var(--border); border-radius: 11px; color: var(--brand-forest); list-style: none; cursor: pointer; }
@@ -279,6 +282,7 @@
   .header-inner { width: calc(100% - 36px); height: 74px; gap: 14px; }
   .brand img { width: 177px; }
   .desktop-nav, .header-cta { display: none; }
+  .header-signin { min-height: 44px; margin-left: auto; padding: 0 14px; }
   .mobile-menu { display: block; }
   .hero-inner { width: calc(100% - 36px); padding-block: 56px 49px; }
   .hero-copy h1 { margin-top: 21px; font-size: clamp(52px, 12vw, 72px); }
@@ -406,6 +410,8 @@ html { scroll-behavior: smooth; scroll-padding-top: 24px; }
 .landing-page a, .landing-page button, .landing-page .feature-card { transition-duration: 250ms; transition-timing-function: var(--landing-ease); }
 .landing-page a:focus-visible, .landing-page summary:focus-visible { outline: 3px solid var(--brand-lime); outline-offset: 4px; }
 .landing-page .feature-card:hover { transform: translateY(-3px); box-shadow: var(--landing-shadow); }
+.landing-page .header-signin { color: var(--brand-mint); }
+.landing-page .header-signin:hover { color: var(--landing-deep); background: var(--brand-mint); }
 .landing-page .mobile-menu summary { color: var(--brand-mint); min-width: 44px; min-height: 44px; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

@@ -213,7 +213,7 @@ export function StudentVerificationReview({ reviewPath = "/student-verifications
         </div>
         <header className="admin-heading">
           <div><span className="admin-eyebrow">Verification queue</span><h1>Student verification</h1><p>Review submitted school details and approve student accounts.</p></div>
-          <button className="admin-refresh admin-refresh-icon" type="button" disabled={busy === "refresh"} onClick={() => void refreshQueue()}><Icon name="refresh" />{busy === "refresh" ? "Refreshing…" : "Refresh submissions"}</button>
+          <button className="admin-refresh admin-refresh-icon" type="button" disabled={busy === "refresh"} aria-busy={busy === "refresh"} onClick={() => void refreshQueue()}><Icon name="refresh" />{busy === "refresh" ? "Refreshing…" : "Refresh submissions"}</button>
         </header>
 
         <section className="admin-stats" aria-label="Verification totals">
@@ -252,7 +252,7 @@ export function StudentVerificationReview({ reviewPath = "/student-verifications
                   <div><dt>Course of study</dt><dd>{record.course}</dd></div>
                 </dl>
                 {record.status === "pending" && <div className="student-actions">
-                  <button className="verify-action" type="button" disabled={Boolean(busy)} onClick={() => void reviewStudent(record, true)}><Icon name="check" />{busy === record.user_id ? "Verifying…" : "Verify student"}</button>
+                  <button className="verify-action" type="button" disabled={Boolean(busy)} aria-busy={busy === record.user_id} onClick={() => void reviewStudent(record, true)}><Icon name="check" />{busy === record.user_id ? "Verifying…" : "Verify student"}</button>
                   <button className="admin-reject" type="button" disabled={Boolean(busy)} onClick={() => { setReason(""); setRejecting(record); }}><Icon name="close" />Reject</button>
                 </div>}
                 {record.status === "verified" && <p className="verified-date">Verified {record.reviewed_at ? new Date(record.reviewed_at).toLocaleDateString("en-GB") : ""}</p>}
@@ -284,7 +284,7 @@ export function StudentVerificationReview({ reviewPath = "/student-verifications
           <label>Reason<textarea rows={3} maxLength={300} value={reason} onChange={(event) => setReason(event.target.value)} required /></label>
           <div className="admin-dialog-actions">
             <button className="admin-refresh" type="button" onClick={() => setRejecting(null)}>Cancel</button>
-            <button className="admin-danger" type="submit" disabled={!reason.trim() || Boolean(busy)}>{busy ? "Rejecting…" : "Reject submission"}</button>
+            <button className="admin-danger" type="submit" disabled={!reason.trim() || Boolean(busy)} aria-busy={Boolean(busy)}>{busy ? "Rejecting…" : "Reject submission"}</button>
           </div>
         </form>
       </AdminDialog>}

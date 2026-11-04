@@ -7,6 +7,7 @@ import { useSimulator } from "../../../lib/queries/simulator";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
+import { PageLoader } from "../../PageLoader";
 
 const statusLabels = { pending: "Pending", success: "Successful", failed: "Failed", reversed: "Reversed" };
 
@@ -99,7 +100,7 @@ function SimulatorContent() {
     return <main className={styles.mainContent}>The simulator is turned off.</main>;
   }
   if (!ready || !wallet || !simulator) {
-    return <main className={styles.mainContent} aria-live="polite">Loading the simulator…</main>;
+    return <PageLoader message="Loading the simulator…" />;
   }
 
   return (
@@ -128,7 +129,7 @@ function SimulatorContent() {
             <label htmlFor="simSender">Sender name (optional)</label>
             <input id="simSender" type="text" maxLength={60} placeholder="e.g. Test Sender" value={sender} onChange={(event) => setSender(event.target.value)} />
           </div>
-          <button className={styles.primaryAction} type="submit" disabled={working}>Send transfer</button>
+          <button className={styles.primaryAction} type="submit" disabled={working} aria-busy={working}>Send transfer</button>
         </form>
 
         <div className={styles.simSection}>
@@ -142,7 +143,7 @@ function SimulatorContent() {
             <p>Clears your transactions, goals, budgets, and locks, and returns the date to today. Your account stays.</p>
             <div className={styles.simActions}>
               {confirmingReset
-                ? <><button className={styles.primaryAction} type="button" disabled={working} onClick={() => void reset()}>Yes, clear my data</button><button className={styles.secondaryAction} type="button" disabled={working} onClick={() => setConfirmingReset(false)}>Cancel</button></>
+                ? <><button className={styles.primaryAction} type="button" disabled={working} aria-busy={working} onClick={() => void reset()}>Yes, clear my data</button><button className={styles.secondaryAction} type="button" disabled={working} onClick={() => setConfirmingReset(false)}>Cancel</button></>
                 : <button className={styles.secondaryAction} type="button" disabled={working} onClick={() => setConfirmingReset(true)}>Reset my data</button>}
             </div>
           </section>

@@ -12,6 +12,7 @@ import { rpcMessage, toKobo, useGoals, useLedger, useRefreshFinance, type RpcRes
 
 import { ContributionSettingsDialog } from "./ContributionSettingsDialog";
 import { GoalWithdrawalButton } from "./GoalWithdrawalButton";
+import { PageLoader } from "../../PageLoader";
 
 const goalOptions = ["Laptop", "Textbook", "Phone", "Bag", "FYB payment", "Tuition", "Accommodation", "Travel", "Emergency fund", "Custom goal"];
 
@@ -92,7 +93,7 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
   const [chosenGoalId, setChosenGoalId] = useState("");
   const contributionGoal = contributionGoals.find((goal) => goal.id === chosenGoalId) ?? contributionGoals[0];
 
-  if (!ready || !ledger) return <main className={styles.mainContent} aria-live="polite">Loading savings goals…</main>;
+  if (!ready || !ledger) return <PageLoader message="Loading savings goals…" />;
 
   return (
     <DashboardFrame email={email} active="Savings Goals">
@@ -140,7 +141,7 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
           </div>
           {error && <p className={styles.goalError} role="alert">{error}</p>}
           <p className={styles.transactionFootnote}>Create your goal first. You can choose automatic or manual contributions next, or skip for now.</p>
-          <button className={styles.primaryAction} type="submit" disabled={saving}>{saving ? "Saving…" : "Save goal"}</button>
+          <button className={styles.primaryAction} type="submit" disabled={saving} aria-busy={saving}>{saving ? "Saving…" : "Save goal"}</button>
         </form>
       )}
 

@@ -1,8 +1,6 @@
-import "../../../../landing/src/app/globals.css";
+import { redirect } from "next/navigation";
 
-export { default } from "../../../../landing/src/app/page";
-
-export const metadata = {
-  title: "StudentSave — Save smart. Spend wisely.",
-  description: "Track spending, plan your budget, and build toward your savings goals.",
-};
+// The landing page now lives at "/". Keep old /landing links working.
+export default function LandingRedirect() {
+  redirect("/");
+}
