@@ -532,3 +532,26 @@ html { scroll-padding-top: 118px; }
   .hero-copy h1 span { color: var(--brand-lime); background: none; }
   .faq-item::details-content { transition: none; }
 }
+
+/* Extra motion layer */
+/* Header gains depth once the page scrolls. */
+@supports (animation-timeline: scroll()) {
+  .landing-page .site-header { animation: header-lift linear both; animation-timeline: scroll(root); animation-range: 0 140px; }
+  /* Hero preview drifts up gently as it leaves the screen. */
+  .landing-page .hero-visual { animation: fade-up .8s .12s cubic-bezier(.2,.7,.2,1) both, hero-parallax linear both; animation-timeline: auto, view(); animation-range: normal, exit 0% exit 100%; }
+}
+.landing-page .section-kicker::before { width: 7px; height: 7px; border-radius: 50%; background: var(--brand-lime); box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-lime) 60%, transparent); content: ""; animation: kicker-pulse 2.4s ease-out infinite; }
+.landing-page .step-item.revealed .step-done { animation: done-pop .6s .35s var(--landing-ease) both; }
+.landing-page .hero-trust svg { animation: trust-glow 3.2s ease-in-out 1.2s infinite; }
+.landing-page .sample-pill > span { animation: kicker-pulse 2s ease-out infinite; }
+.landing-page .footer-links a { position: relative; }
+.landing-page .footer-links a::after { position: absolute; right: 0; bottom: -2px; left: 0; height: 1px; transform: scaleX(0); transform-origin: right; background: currentColor; content: ""; transition: transform .25s var(--landing-ease); }
+.landing-page .footer-links a:hover::after { transform: scaleX(1); transform-origin: left; }
+.landing-page .button:active, .landing-page .header-cta:active { transform: scale(.97); }
+.landing-page .intro-item.revealed .intro-mark { animation: done-pop .55s .15s var(--landing-ease) both; }
+
+@keyframes header-lift { to { box-shadow: 0 10px 30px #00190e40; } }
+@keyframes hero-parallax { to { translate: 0 -40px; opacity: .65; } }
+@keyframes kicker-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-lime) 60%, transparent); } 70%, 100% { box-shadow: 0 0 0 8px transparent; } }
+@keyframes done-pop { 0% { opacity: 0; scale: .4; } 70% { scale: 1.12; } 100% { opacity: 1; scale: 1; } }
+@keyframes trust-glow { 0%, 100% { filter: none; } 50% { filter: drop-shadow(0 0 6px var(--brand-lime)); } }

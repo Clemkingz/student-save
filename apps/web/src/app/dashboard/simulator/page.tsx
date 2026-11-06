@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useRef, useState, type FormEvent } from "react";
+import { Suspense, useRef, useState } from "react";
 import { createClient } from "@repo/supabase/browser";
-import { rpcMessage, toKobo, useRefreshFinance, type RpcResult } from "../../../lib/queries/ledger";
+import { rpcMessage, useRefreshFinance, type RpcResult } from "../../../lib/queries/ledger";
 import { useSimulator } from "../../../lib/queries/simulator";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { useDashboardSession } from "../_components/useDashboardSession";
@@ -28,10 +28,7 @@ function SimulatorContent() {
   const { data: simulator } = useSimulator(ready ? userId : "");
   const refreshFinance = useRefreshFinance();
   const busy = useRef(false);
-  const transferKey = useRef("");
   const [working, setWorking] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [sender, setSender] = useState("");
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -52,24 +49,6 @@ function SimulatorContent() {
     busy.current = false;
     setWorking(false);
     return succeeded;
-  }
-
-  async function sendTransfer(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      setError("Enter an amount greater than zero.");
-      return;
-    }
-    transferKey.current ||= crypto.randomUUID();
-    const sent = await run(
-      () => createClient().rpc("sim_incoming_transfer", { p_amount: toKobo(numericAmount), p_sender: sender.trim(), p_idempotency_key: transferKey.current }),
-      () => "Transfer started. It settles in a few seconds.",
-    );
-    if (!sent) return;
-    transferKey.current = "";
-    setAmount("");
-    setSender("");
   }
 
   const settle = (transfer: string, outcome: "success" | "failed") => run(
@@ -107,7 +86,7 @@ function SimulatorContent() {
     <DashboardFrame email={email} active="Simulator">
       <header className={styles.pageHeading}>
         <h1>Simulator</h1>
-        <p>Control the simulated bank and clock. No real money moves.</p>
+        <p>Control the simulated clock and review test transfers. No real money moves. Add test money from Add funds.</p>
       </header>
 
       <section className={styles.fundsSummary} aria-label="Simulator status">
@@ -118,41 +97,26 @@ function SimulatorContent() {
       {error && <p className={styles.goalError} role="alert">{error}</p>}
       {notice && <p className={styles.transactionSaved} role="status">{notice}</p>}
 
-      <div className={styles.fundsContentGrid}>
-        <form className={`${styles.panel} ${styles.simSection}`} onSubmit={sendTransfer} noValidate>
-          <h2>Incoming transfer</h2>
-          <div className={styles.transactionField}>
-            <label htmlFor="simAmount">Amount</label>
-            <div className={styles.transactionAmount}><span aria-hidden="true">₦</span><input id="simAmount" type="number" inputMode="decimal" min="0.01" step="0.01" placeholder="0.00" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>
+      <div className={styles.simControls}>
+        <section className={`${styles.panel} ${styles.simSection}`}>
+          <h2>Advance time</h2>
+          <p>Runs anything due, such as automatic savings. Time only moves forward.</p>
+          <div className={styles.simActions}>{[1, 7, 30].map((days) => <button className={styles.secondaryAction} type="button" disabled={working} onClick={() => void advance(days)} key={days}>{days === 1 ? "1 day" : `${days} days`}</button>)}</div>
+        </section>
+        <section className={`${styles.panel} ${styles.simSection}`}>
+          <h2>Reset my data</h2>
+          <p>Clears your transactions, goals, budgets, and locks, and returns the date to today. Your account stays.</p>
+          <div className={styles.simActions}>
+            {confirmingReset
+              ? <><button className={styles.primaryAction} type="button" disabled={working} aria-busy={working} onClick={() => void reset()}>Yes, clear my data</button><button className={styles.secondaryAction} type="button" disabled={working} onClick={() => setConfirmingReset(false)}>Cancel</button></>
+              : <button className={styles.secondaryAction} type="button" disabled={working} onClick={() => setConfirmingReset(true)}>Reset my data</button>}
           </div>
-          <div className={styles.transactionField}>
-            <label htmlFor="simSender">Sender name (optional)</label>
-            <input id="simSender" type="text" maxLength={60} placeholder="e.g. Test Sender" value={sender} onChange={(event) => setSender(event.target.value)} />
-          </div>
-          <button className={styles.primaryAction} type="submit" disabled={working} aria-busy={working}>Send transfer</button>
-        </form>
-
-        <div className={styles.simSection}>
-          <section className={`${styles.panel} ${styles.simSection}`}>
-            <h2>Advance time</h2>
-            <p>Runs anything due, such as automatic savings. Time only moves forward.</p>
-            <div className={styles.simActions}>{[1, 7, 30].map((days) => <button className={styles.secondaryAction} type="button" disabled={working} onClick={() => void advance(days)} key={days}>{days === 1 ? "1 day" : `${days} days`}</button>)}</div>
-          </section>
-          <section className={`${styles.panel} ${styles.simSection}`}>
-            <h2>Reset my data</h2>
-            <p>Clears your transactions, goals, budgets, and locks, and returns the date to today. Your account stays.</p>
-            <div className={styles.simActions}>
-              {confirmingReset
-                ? <><button className={styles.primaryAction} type="button" disabled={working} aria-busy={working} onClick={() => void reset()}>Yes, clear my data</button><button className={styles.secondaryAction} type="button" disabled={working} onClick={() => setConfirmingReset(false)}>Cancel</button></>
-                : <button className={styles.secondaryAction} type="button" disabled={working} onClick={() => setConfirmingReset(true)}>Reset my data</button>}
-            </div>
-          </section>
-        </div>
+        </section>
       </div>
 
       <section className={styles.panel}>
         <h2>Activity log</h2>
-        {simulator.transfers.length === 0 ? <p>No simulated transfers yet.</p> : (
+        {simulator.transfers.length === 0 ? <p className={styles.emptyTransactions}>No simulated transfers yet.</p> : (
           <ol className={styles.simLog}>
             {simulator.transfers.map((transfer) => (
               <li key={transfer.id}>

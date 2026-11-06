@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createAdminClient } from "@repo/supabase/browser";
@@ -11,6 +12,7 @@ export default function AdminSignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -48,7 +50,7 @@ export default function AdminSignInPage() {
         </div>
         <div className={styles.field}>
           <label htmlFor="password">Password</label>
-          <input id="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+          <div className={styles.secretField}><input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
         </div>
         {notice && <p className={styles.formNotice} role="status">{notice}</p>}
         <button className={styles.submitButton} type="submit" disabled={submitting} aria-busy={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>

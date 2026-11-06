@@ -2,6 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { Lock } from "lucide-react";
 import { ManualContribution } from "./ManualContribution";
 import { DashboardFrame } from "./DashboardFrame";
 import { useDashboardSession } from "./useDashboardSession";
@@ -89,7 +90,10 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
   }
 
   const visibleGoals = goalId ? goals.filter((goal) => goal.id === goalId) : goals;
-  const contributionGoals = visibleGoals.filter((goal) => !goal.withdrawnAt && goal.savedAmount < goal.targetAmount);
+  const openGoals = visibleGoals.filter((goal) => !goal.withdrawnAt && goal.savedAmount < goal.targetAmount);
+  // Automatic goals only take money from their schedule. Switching to manual in contribution settings unlocks them.
+  const contributionGoals = openGoals.filter((goal) => goal.contributionMethod !== "auto");
+  const automaticGoals = openGoals.filter((goal) => goal.contributionMethod === "auto");
   const [chosenGoalId, setChosenGoalId] = useState("");
   const contributionGoal = contributionGoals.find((goal) => goal.id === chosenGoalId) ?? contributionGoals[0];
 
@@ -119,6 +123,8 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
         </div>
       </div>
 
+      {contributionGoals.length === 0 && automaticGoals.length > 0 && <p className={styles.goalLockedNote}><Lock size={14} aria-hidden="true" /> {goalId ? "This goal saves automatically." : "Your open goals save automatically."} Switch to manual in contribution settings to add funds yourself.</p>}
+
       {mode === "goal" && (
         <form className={`${styles.panel} ${styles.goalForm}`} onSubmit={saveGoal} noValidate>
           <h2>Create a savings goal</h2>
@@ -146,11 +152,14 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
       )}
 
       {mode === "contribution" && contributionGoal && <section className={styles.manualContributionGrid} aria-label="Manual contribution">
-        {contributionGoals.length > 1 && <div className={`${styles.panel} ${styles.contributionPicker}`}>
+        {contributionGoals.length + automaticGoals.length > 1 && <div className={`${styles.panel} ${styles.contributionPicker}`}>
           <h2 id="contributionPickerLabel">Choose a goal</h2>
           <div className={styles.contributionPickerList} role="radiogroup" aria-labelledby="contributionPickerLabel">
             {contributionGoals.map((goal) => <button key={goal.id} type="button" role="radio" aria-checked={goal.id === contributionGoal.id} className={goal.id === contributionGoal.id ? styles.contributionPickerActive : styles.contributionPickerOption} onClick={() => setChosenGoalId(goal.id)}>
               <strong>{goal.name}</strong><span>{money(goal.savedAmount)} of {money(goal.targetAmount)}</span>
+            </button>)}
+            {automaticGoals.map((goal) => <button key={goal.id} type="button" role="radio" aria-checked={false} aria-disabled="true" disabled className={`${styles.contributionPickerOption} ${styles.contributionPickerLocked}`} title="Switch to manual in contribution settings to add funds">
+              <strong><Lock size={14} aria-hidden="true" /> {goal.name}</strong><span>Automatic · change in contribution settings</span>
             </button>)}
           </div>
         </div>}
@@ -172,6 +181,7 @@ export function SavingsGoalsContent({ goalId }: { goalId?: string }) {
                   <div className={styles.progressTrack}><div className={styles.progressBar} style={{ width: `${progress}%` }} /></div>
                   <p>{goal.contributionMethod === "auto" ? `${money(goal.autoAmount ?? 0)} ${goal.autoFrequency} contribution` : goal.contributionMethod === "manual" ? "Manual contributions · add money whenever you choose" : "No contribution method selected"}{goal.dueDate ? ` · due ${new Date(`${goal.dueDate}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : ""}</p>
                   <p>{goal.withdrawnAt ? `Withdrawn · ${new Date(goal.withdrawnAt).toLocaleDateString("en-GB")}` : goal.autoContribute ? `Automatic · next due ${goal.nextContributionDate}` : goal.contributionMethod === "auto" ? "Automatic contributions paused" : "Automatic contributions off"}</p>
+                  {goal.contributionMethod === "auto" && !goal.withdrawnAt && goal.savedAmount < goal.targetAmount && <p className={styles.goalLockedNote}><Lock size={14} aria-hidden="true" /> Manual top-ups are off for this goal. Change it to manual in contribution settings to add funds.</p>}
                   <div className={styles.goalCardActions}>
                     <button className={styles.secondaryAction} type="button" disabled={saving || Boolean(goal.withdrawnAt)} onClick={() => setSettingsGoal(goal)}>Contribution settings</button>
                     {goal.autoContribute && !goal.withdrawnAt && goal.savedAmount < goal.targetAmount && <button className={styles.secondaryAction} type="button" disabled={saving} onClick={() => void pauseContributions(goal.id)}>Pause automatic savings</button>}

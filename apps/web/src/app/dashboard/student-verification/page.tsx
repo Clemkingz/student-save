@@ -6,11 +6,15 @@ import Link from "next/link";
 import { createClient } from "@repo/supabase/browser";
 import { DashboardFrame } from "../_components/DashboardFrame";
 import { useDashboardSession } from "../_components/useDashboardSession";
+import { CourseSelect } from "../_components/CourseSelect";
+import { OTHER, OtherDetailField, resolveOther } from "../_components/OtherDetailField";
 import { UniversitySelect } from "../_components/UniversitySelect";
 import styles from "../dashboard.module.css";
 import { PageLoader } from "../../PageLoader";
 
 type VerificationStatus = "pending" | "verified" | "rejected" | "not-submitted";
+
+const levels = ["100", "200", "300", "400", "500", "600", "700", "Postgraduate", OTHER];
 
 function compressImage(file: File, maxDimension: number, maxDataUrlLength: number) {
   return createImageBitmap(file).then((bitmap) => {
@@ -39,6 +43,7 @@ function StudentVerificationContent() {
   const [institution, setInstitution] = useState("");
   const [matricNumber, setMatricNumber] = useState("");
   const [level, setLevel] = useState("");
+  const [levelDetail, setLevelDetail] = useState("");
   const [course, setCourse] = useState("");
   const [schoolIdImage, setSchoolIdImage] = useState("");
   const [schoolIdFileName, setSchoolIdFileName] = useState("");
@@ -58,7 +63,9 @@ function StudentVerificationContent() {
     if (!details) return null;
     setInstitution(details.institution);
     setMatricNumber(details.matric_number);
-    setLevel(details.level);
+    const listedLevel = levels.includes(details.level);
+    setLevel(listedLevel ? details.level : OTHER);
+    setLevelDetail(listedLevel ? "" : details.level);
     setCourse(details.course);
     setSchoolIdPath(details.school_id_path);
     setSchoolIdFileName(details.school_id_file_name);
@@ -151,6 +158,9 @@ function StudentVerificationContent() {
   async function submitDetails(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!institution.trim()) { setError("Choose your university or enter your institution using Other."); return; }
+    if (!level) { setError("Select your level."); return; }
+    if (!resolveOther(level, levelDetail)) { setError("Describe your level."); return; }
+    if (!course.trim()) { setError("Choose your course or enter it using Other."); return; }
     if (!schoolIdImage) {
       setError("Upload a clear image of your school ID card.");
       setNotice("");
@@ -178,7 +188,7 @@ function StudentVerificationContent() {
       const { data, error: submitError } = await supabase.rpc("submit_student_verification", {
         p_institution: institution.trim(),
         p_matric_number: matricNumber.trim(),
-        p_level: level,
+        p_level: resolveOther(level, levelDetail),
         p_course: course.trim(),
         p_school_id_path: path,
         p_school_id_file_name: schoolIdFileName,
@@ -260,8 +270,9 @@ function StudentVerificationContent() {
           <div className={styles.studentVerificationFields}>
             <UniversitySelect key={ready ? "ready" : "loading"} value={institution} onChange={setInstitution} />
             <div className={styles.transactionField}><label htmlFor="matricNumber">Matriculation number</label><input id="matricNumber" value={matricNumber} onChange={(event) => setMatricNumber(event.target.value)} placeholder="Enter your matric number" required /></div>
-            <div className={styles.transactionField}><label htmlFor="level">Level</label><select id="level" value={level} onChange={(event) => setLevel(event.target.value)} required><option value="" disabled>Select your level</option>{["100", "200", "300", "400", "500", "600", "700", "Postgraduate", "Other"].map((option) => <option key={option} value={option}>{option === "Postgraduate" || option === "Other" ? option : `${option} level`}</option>)}</select></div>
-            <div className={styles.transactionField}><label htmlFor="course">Course of study</label><input id="course" value={course} onChange={(event) => setCourse(event.target.value)} placeholder="e.g. Computer Science" required /></div>
+            <div className={styles.transactionField}><label htmlFor="level">Level</label><select id="level" value={level} onChange={(event) => setLevel(event.target.value)} required><option value="" disabled>Select your level</option>{levels.map((option) => <option key={option} value={option}>{option === "Postgraduate" || option === "Other" ? option : `${option} level`}</option>)}</select></div>
+            {level === OTHER && <OtherDetailField id="levelDetail" label="Describe your level" placeholder="e.g. Pre-degree, Diploma, Direct entry 200" value={levelDetail} onChange={setLevelDetail} />}
+            <CourseSelect university={institution} value={course} onChange={setCourse} />
           </div>
 
           <div className={styles.schoolIdUpload}>

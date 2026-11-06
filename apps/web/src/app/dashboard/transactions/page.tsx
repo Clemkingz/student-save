@@ -12,6 +12,7 @@ import { TransactionSuccessPopup } from "../_components/TransactionSuccessPopup"
 import { localDateValue, type MockTransaction } from "../_components/mockFinance";
 import { rpcMessage, toKobo, useLedger, useRefreshFinance, type RpcResult } from "../../../lib/queries/ledger";
 import { useDashboardSession } from "../_components/useDashboardSession";
+import { OTHER, OtherDetailField, resolveOther } from "../_components/OtherDetailField";
 import styles from "../dashboard.module.css";
 import { PageLoader } from "../../PageLoader";
 
@@ -34,7 +35,8 @@ function TransactionContent() {
   const { data: ledger, refetch } = useLedger(ready ? userId : "");
   const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<string>(expenseCategories[0] ?? "Other");
+  const [category, setCategory] = useState<string>(expenseCategories[0] ?? OTHER);
+  const [categoryDetail, setCategoryDetail] = useState("");
   const [date, setDate] = useState(localDateValue());
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
@@ -48,6 +50,7 @@ function TransactionContent() {
   const [editing, setEditing] = useState<{ transaction: MockTransaction; mode: "edit" | "delete" } | null>(null);
   const [editAmount, setEditAmount] = useState("");
   const [editCategory, setEditCategory] = useState("");
+  const [editCategoryDetail, setEditCategoryDetail] = useState("");
   const [editDate, setEditDate] = useState("");
   const [editNote, setEditNote] = useState("");
   const [editPin, setEditPin] = useState("");
@@ -63,6 +66,7 @@ function TransactionContent() {
   const [paymentError, setPaymentError] = useState("");
   const [transactionPin, setTransactionPin] = useState("");
   const [showPin, setShowPin] = useState(false);
+  const chosenCategory = resolveOther(category, categoryDetail);
   const categories = type === "expense" ? expenseCategories : type === "withdrawal" ? ["Withdrawal"] : incomeCategories;
   const transactions = ledger?.transactions ?? [];
   const balance = ledger?.balance ?? 0;
@@ -76,7 +80,10 @@ function TransactionContent() {
   function openEditor(transaction: MockTransaction, mode: "edit" | "delete") {
     setEditing({ transaction, mode });
     setEditAmount(String(transaction.amount));
-    setEditCategory(transaction.category);
+    const editOptions = transaction.kind === "income" ? incomeCategories : expenseCategories;
+    const listed = editOptions.includes(transaction.category) || transaction.category === "Withdrawal";
+    setEditCategory(listed ? transaction.category : OTHER);
+    setEditCategoryDetail(listed ? "" : transaction.category);
     setEditDate(transaction.date);
     setEditNote(transaction.note);
     setEditPin("");
@@ -86,11 +93,12 @@ function TransactionContent() {
   async function saveEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editing) return;
+    if (editing.mode === "edit" && !resolveOther(editCategory, editCategoryDetail)) { setEditError("Describe the category."); return; }
     setSubmitting(true);
     const supabase = createClient();
     const { data, error: rpcError } = editing.mode === "delete"
       ? await supabase.rpc("delete_transaction", { p_id: editing.transaction.id, p_pin: editPin })
-      : await supabase.rpc("update_transaction", { p_id: editing.transaction.id, p_amount: toKobo(Number(editAmount)), p_category: editCategory, p_occurred_on: editDate, p_note: editNote.trim(), p_pin: editPin });
+      : await supabase.rpc("update_transaction", { p_id: editing.transaction.id, p_amount: toKobo(Number(editAmount)), p_category: resolveOther(editCategory, editCategoryDetail), p_occurred_on: editDate, p_note: editNote.trim(), p_pin: editPin });
     setSubmitting(false);
     const result = data as RpcResult | null;
     if (rpcError || !result?.ok) {
@@ -104,15 +112,16 @@ function TransactionContent() {
 
   function changeType(nextType: TransactionType) {
     setType(nextType);
-    setCategory(nextType === "expense" ? expenseCategories[0] ?? "Other" : nextType === "withdrawal" ? "Withdrawal" : incomeCategories[0] ?? "Other");
+    setCategory(nextType === "expense" ? expenseCategories[0] ?? OTHER : nextType === "withdrawal" ? "Withdrawal" : incomeCategories[0] ?? OTHER);
+    setCategoryDetail("");
     setError("");
     setNotice("");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!category) {
-      setError("Choose a transaction category.");
+    if (!chosenCategory) {
+      setError(category === OTHER ? "Describe what this transaction is for." : "Choose a transaction category.");
       setNotice("");
       return;
     }
@@ -134,7 +143,7 @@ function TransactionContent() {
       attemptKey.current ||= crypto.randomUUID();
       const { data, error: rpcError } = await createClient().rpc("record_income", {
         p_amount: toKobo(numericAmount),
-        p_category: category,
+        p_category: chosenCategory,
         p_occurred_on: date,
         p_note: note.trim(),
         p_idempotency_key: attemptKey.current,
@@ -217,7 +226,7 @@ function TransactionContent() {
     const { data, error: rpcError } = await createClient().rpc("start_transfer", {
       p_kind: type,
       p_amount: toKobo(Number(amount)),
-      p_category: type === "withdrawal" ? "Withdrawal" : category,
+      p_category: type === "withdrawal" ? "Withdrawal" : chosenCategory,
       p_occurred_on: date,
       p_note: note.trim(),
       p_bank_code: recipientBankCode,
@@ -294,6 +303,7 @@ function TransactionContent() {
               {categories.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </div>
+          {category === OTHER && <OtherDetailField id="categoryDetail" label={type === "income" ? "Describe the source" : "Describe the expense"} placeholder={type === "income" ? "e.g. Sold old textbooks" : "e.g. Hostel repairs"} value={categoryDetail} onChange={(value) => { setCategoryDetail(value); setError(""); }} />}
 
           <div className={styles.transactionField}>
             <label htmlFor="date">Date</label>
@@ -336,7 +346,7 @@ function TransactionContent() {
             <span className={styles.fundsStep}>{type === "withdrawal" ? "CASH WITHDRAWAL" : "EXPENSE PAYMENT"}</span>
             <h2 id="paymentDialogTitle">{type === "withdrawal" ? "Where should we send it?" : "Recipient account details"}</h2>
             <p>{type === "withdrawal" ? "Enter where this withdrawal should be sent." : "Enter the account receiving this payment."}</p>
-            <div className={styles.paymentAmount}><span>Amount</span><strong>{formatAmount(Number(amount) || 0)}</strong><small>{type === "withdrawal" ? "Cash withdrawal" : category}</small></div>
+            <div className={styles.paymentAmount}><span>Amount</span><strong>{formatAmount(Number(amount) || 0)}</strong><small>{type === "withdrawal" ? "Cash withdrawal" : chosenCategory}</small></div>
             <div className={styles.transactionField}><label htmlFor="recipientBank">Recipient bank</label><select id="recipientBank" value={recipientBankCode} onChange={(event) => { setRecipientBankCode(event.target.value); setRecipientName(""); setAccountResolved(false); setPaymentError(""); setResolutionError(""); }}><option value="">Select bank</option>{banks.map((bank) => <option key={bank.code} value={bank.code}>{bank.name}</option>)}</select></div>
             <div className={styles.transactionField}><label htmlFor="recipientAccountNumber">Recipient account number</label><input id="recipientAccountNumber" inputMode="numeric" autoComplete="off" maxLength={10} value={recipientAccountNumber} onChange={(event) => { setRecipientAccountNumber(event.target.value.replace(/\D/g, "").slice(0, 10)); setRecipientName(""); setAccountResolved(false); setResolutionError(""); setPaymentError(""); }} placeholder="10-digit account number" /><button className={styles.mockResolveButton} type="button" onClick={resolveRecipientAccount} disabled={resolvingAccount || !recipientBankCode || recipientAccountNumber.length !== 10} aria-busy={resolvingAccount}>{resolvingAccount ? "Looking up account…" : accountResolved ? "Account found" : "Find account name"}</button>{resolutionError && <span className={styles.transactionError} role="alert">{resolutionError}</span>}</div>
             <div className={styles.transactionField}><label htmlFor="recipientName">Recipient account name</label><input id="recipientName" autoComplete="off" readOnly value={recipientName} placeholder="Find the account name" /><span className={styles.transactionFootnote}>Recipient details are simulated for testing.</span></div>
@@ -354,7 +364,7 @@ function TransactionContent() {
             <span className={styles.fundsStep}>FINAL STEP · TRANSACTION SECURITY</span>
             <h2 id="transactionPinTitle">Enter your transaction PIN</h2>
             <p>Confirm this {type === "withdrawal" ? "withdrawal" : "payment"} using your personal 4-digit PIN.</p>
-            <div className={styles.paymentAmount}><span>Amount</span><strong>{formatAmount(Number(amount) || 0)}</strong><small>{type === "withdrawal" ? "Withdrawal" : category}</small></div>
+            <div className={styles.paymentAmount}><span>Amount</span><strong>{formatAmount(Number(amount) || 0)}</strong><small>{type === "withdrawal" ? "Withdrawal" : chosenCategory}</small></div>
             <div className={styles.recipientReview}>
               <span>Sending to</span>
               <strong>{recipientName}</strong>
@@ -371,6 +381,7 @@ function TransactionContent() {
           {editing.mode === "delete" ? <p>{editing.transaction.category} · {formatAmount(editing.transaction.amount)}. Your balance, budgets, and reports will update.</p> : <>
             <div className={styles.transactionField}><label htmlFor="editAmount">Amount (₦)</label><input id="editAmount" type="number" inputMode="decimal" min="0.01" step="0.01" value={editAmount} onChange={(event) => setEditAmount(event.target.value)} /></div>
             <div className={styles.transactionField}><label htmlFor="editCategory">Category</label><select id="editCategory" value={editCategory} onChange={(event) => setEditCategory(event.target.value)}>{(editing.transaction.kind === "income" ? incomeCategories : expenseCategories).map((option) => <option key={option} value={option}>{option}</option>)}</select></div>
+            {editCategory === OTHER && <OtherDetailField id="editCategoryDetail" label="Describe the category" value={editCategoryDetail} onChange={setEditCategoryDetail} />}
             <div className={styles.transactionField}><label htmlFor="editDate">Date</label><input id="editDate" type="date" value={editDate} onChange={(event) => setEditDate(event.target.value)} /></div>
             <div className={styles.transactionField}><label htmlFor="editNote">Note</label><input id="editNote" type="text" maxLength={120} value={editNote} onChange={(event) => setEditNote(event.target.value)} /></div>
           </>}

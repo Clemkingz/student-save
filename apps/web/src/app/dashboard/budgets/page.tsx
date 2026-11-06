@@ -8,6 +8,7 @@ import { rpcMessage, toKobo, useBudgets, useLedger, type RpcResult } from "../..
 import { isSuccessfulCredit } from "../_components/mockFinance";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
+import { OTHER, OtherDetailField, resolveOther } from "../_components/OtherDetailField";
 import { PageLoader } from "../../PageLoader";
 
 const categories = ["Food", "Transport", "Travelling", "Textbook", "Laptop", "Accommodation", "Utilities", "Healthcare", "Entertainment", "Data", "Other"];
@@ -22,7 +23,8 @@ function BudgetsContent() {
   const { data: budgets = [], refetch: refetchBudgets } = useBudgets(ready ? userId : "");
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [category, setCategory] = useState(categories[0]);
+  const [category, setCategory] = useState(categories[0] ?? OTHER);
+  const [categoryDetail, setCategoryDetail] = useState("");
   const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -36,8 +38,9 @@ function BudgetsContent() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!category) {
-      setError("Choose an expense category.");
+    const chosenCategory = resolveOther(category, categoryDetail);
+    if (!chosenCategory) {
+      setError(category === OTHER ? "Describe what this budget is for." : "Choose an expense category.");
       setNotice("");
       return;
     }
@@ -48,8 +51,8 @@ function BudgetsContent() {
       return;
     }
     const roundedAmount = Math.round(numericAmount * 100) / 100;
-    if (currentBudgets.some((budget) => budget.category === category)) {
-      setError(`A ${category.toLowerCase()} budget already exists for this month.`);
+    if (currentBudgets.some((budget) => budget.category.toLowerCase() === chosenCategory.toLowerCase())) {
+      setError(`A ${chosenCategory.toLowerCase()} budget already exists for this month.`);
       setNotice("");
       return;
     }
@@ -60,7 +63,7 @@ function BudgetsContent() {
     }
 
     setSaving(true);
-    const { data, error: rpcError } = await createClient().rpc("create_budget", { p_category: category ?? "", p_amount: toKobo(roundedAmount) });
+    const { data, error: rpcError } = await createClient().rpc("create_budget", { p_category: chosenCategory, p_amount: toKobo(roundedAmount) });
     setSaving(false);
     const result = data as RpcResult | null;
     if (rpcError || !result?.ok) {
@@ -69,8 +72,9 @@ function BudgetsContent() {
     }
     await refetchBudgets();
     setAmount("");
+    setCategoryDetail("");
     setError("");
-    setNotice(`${category} budget created.`);
+    setNotice(`${chosenCategory} budget created.`);
     setShowForm(false);
   }
 
@@ -93,7 +97,7 @@ function BudgetsContent() {
 
       {budgetCeiling === 0 && <p className={styles.budgetLimitHint}>No budgetable balance is available. <Link className={styles.budgetHintLink} href="/dashboard/transactions">Record income or update your transactions</Link> before creating a budget.</p>}
 
-      <button className={styles.createBudgetButton} type="button" disabled={remainingToBudget <= 0 && !showForm} onClick={() => { if (!showForm) setCategory(categories.find((item) => !currentBudgets.some((budget) => budget.category === item)) || categories[0]); setShowForm((visible) => !visible); setError(""); setNotice(""); }}>
+      <button className={styles.createBudgetButton} type="button" disabled={remainingToBudget <= 0 && !showForm} onClick={() => { if (!showForm) setCategory(categories.find((item) => !currentBudgets.some((budget) => budget.category === item)) ?? OTHER); setCategoryDetail(""); setShowForm((visible) => !visible); setError(""); setNotice(""); }}>
         {showForm ? "Close budget form" : "Create budget"}
       </button>
 
@@ -103,10 +107,11 @@ function BudgetsContent() {
           <div className={styles.budgetFormFields}>
             <div className={styles.transactionField}>
               <label htmlFor="budgetCategory">Expense category</label>
-              <select id="budgetCategory" value={category} onChange={(event) => setCategory(event.target.value)}>
-                {categories.filter((item) => !currentBudgets.some((budget) => budget.category === item)).map((item) => <option key={item} value={item}>{item}</option>)}
+              <select id="budgetCategory" value={category} onChange={(event) => { setCategory(event.target.value); setError(""); }}>
+                {categories.filter((item) => item === OTHER || !currentBudgets.some((budget) => budget.category === item)).map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </div>
+            {category === OTHER && <OtherDetailField id="budgetCategoryDetail" label="Describe this budget" placeholder="e.g. Gym membership" value={categoryDetail} onChange={(value) => { setCategoryDetail(value); setError(""); }} />}
             <div className={styles.transactionField}>
               <label htmlFor="budgetAmount">Budget amount</label>
               <div className={styles.transactionAmount}><span aria-hidden="true">₦</span><input id="budgetAmount" type="number" inputMode="decimal" min="0.01" step="0.01" placeholder="0.00" value={amount} onChange={(event) => { setAmount(event.target.value); setError(""); setNotice(""); }} aria-invalid={Boolean(error)} aria-describedby={error ? "budgetAmount-error" : undefined} /></div>

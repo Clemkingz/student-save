@@ -10,3 +10,9 @@ coverage
 pnpm-debug.log*
 
 .test-build
+
+# OS and tool caches
+.DS_Store
+.pnpm-store
+*.tsbuildinfo
+.vercel

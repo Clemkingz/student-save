@@ -47,10 +47,10 @@ export default function SignInPage() {
           <label htmlFor="email">Email</label>
           <input id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required value={email} onChange={(event) => { setEmail(event.target.value); setNotice(""); }} />
         </div>
-        <div className={styles.signinBox}><Link href="/auth/forgot-password">Forgot password?</Link></div>
         <div className={styles.field}>
           <label htmlFor="password">Password</label>
-          <div className={styles.secretField}><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Your password" required value={password} onChange={(event) => { setPassword(event.target.value); setNotice(""); }} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
+          <div className={styles.secretField}><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Your password" required value={password} onChange={(event) => { setPassword(event.target.value); setNotice(""); }} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
+          <Link className={styles.forgotLink} href="/auth/forgot-password">Forgot password?</Link>
         </div>
         {notice && <p className={styles.formNotice} role="status">{notice}</p>}
         <button className={styles.submitButton} type="submit" disabled={submitting} aria-busy={submitting}>Sign in</button>

@@ -86,7 +86,9 @@ begin
   today := public.get_app_today();
   perform pg_temp.code(public.set_school_status('out-of-school'), 'forbidden', 'student sets school status');
   perform pg_temp.code(public.record_income(0, 'Gift', null, '', 'zero'), 'invalid_amount', 'zero amount');
-  perform pg_temp.code(public.record_income(100, 'Lottery', null, '', 'bad-cat'), 'invalid_category', 'bad category');
+  perform pg_temp.code(public.record_income(100, 'Opening balance', null, '', 'bad-cat'), 'invalid_category', 'reserved category');
+  perform pg_temp.code(public.record_income(100, '   ', null, '', 'blank-cat'), 'invalid_category', 'blank category');
+  perform pg_temp.code(public.record_income(100, repeat('x', 61), null, '', 'long-cat'), 'invalid_category', 'category too long');
   perform pg_temp.ok(public.set_opening_balance(100000, 'open'), 'opening balance');
   perform pg_temp.code(public.set_opening_balance(100000, 'open-2'), 'ledger_not_empty', 'second opening balance');
   perform pg_temp.ok(public.record_income(900000, 'Gift', null, '', 'inc-1'), 'income');
@@ -161,6 +163,8 @@ begin
   perform pg_temp.eq((select spent_kobo from public.budget_usage where category = 'Data'), 100000::bigint, 'Data budget shows spending');
   perform pg_temp.code(public.create_budget('Data', 100), 'budget_exists', 'duplicate budget');
   perform pg_temp.code(public.create_budget('Food', 99000000), 'budget_exceeds_available', 'budget above ceiling');
+  perform pg_temp.ok(public.create_budget('Gym membership', 100), 'custom budget category');
+  perform pg_temp.code(public.create_budget('Withdrawal', 100), 'invalid_category', 'reserved budget category');
 
   -- Manual goal, target, and withdrawal
   goal := (pg_temp.ok(public.create_goal('Laptop', 300000, null, 'goal-1'), 'goal') ->> 'goal_id')::uuid;
@@ -180,6 +184,7 @@ begin
   goal := (pg_temp.ok(public.create_goal('Trip', 550, null, 'goal-2'), 'auto goal') ->> 'goal_id')::uuid;
   perform pg_temp.code(public.set_goal_contribution_settings(goal, 'auto', 100, 'daily', '0000'), 'pin_incorrect', 'auto without pin');
   perform pg_temp.ok(public.set_goal_contribution_settings(goal, 'auto', 100, 'daily', '1234'), 'auto on');
+  perform pg_temp.code(public.contribute_to_goal(goal, 100, '1234', 'c-auto'), 'goal_is_automatic', 'manual contribution to automatic goal');
   perform pg_temp.eq(pg_temp.ok(public.sim_advance_days(7), 'advance') ->> 'contributed', '6', 'six contributions to target');
   perform pg_temp.eq((select saved_kobo from public.goal_progress where id = goal), 550::bigint, 'stops at target');
   perform pg_temp.eq((select min(amount_kobo) from public.transactions where goal_id = goal), 50::bigint, 'last contribution capped');

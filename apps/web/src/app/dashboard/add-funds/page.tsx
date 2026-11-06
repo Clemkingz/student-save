@@ -9,6 +9,7 @@ import { MockReceipt } from "../_components/MockReceipt";
 import { TransactionSuccessPopup } from "../_components/TransactionSuccessPopup";
 import { useDashboardSession } from "../_components/useDashboardSession";
 import styles from "../dashboard.module.css";
+import { OTHER, OtherDetailField, resolveOther } from "../_components/OtherDetailField";
 import { PageLoader } from "../../PageLoader";
 
 const fundSources = ["Allowance", "Scholarship", "Gift", "Salary", "Freelance", "Other"];
@@ -26,7 +27,8 @@ function AddFundsContent() {
   const [submitting, setSubmitting] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [amount, setAmount] = useState("");
-  const [source, setSource] = useState(fundSources[0] ?? "Other");
+  const [source, setSource] = useState(fundSources[0] ?? OTHER);
+  const [sourceDetail, setSourceDetail] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -51,12 +53,18 @@ function AddFundsContent() {
       setNotice("");
       return;
     }
+    const chosenSource = resolveOther(source, sourceDetail);
+    if (!chosenSource) {
+      setError("Describe where the money came from.");
+      setNotice("");
+      return;
+    }
     busy.current = true; setSubmitting(true);
     attemptKey.current ||= crypto.randomUUID();
     const supabase = createClient();
     const { data, error: rpcError } = source === "Opening balance"
       ? await supabase.rpc("set_opening_balance", { p_amount: toKobo(numericAmount), p_idempotency_key: attemptKey.current })
-      : await supabase.rpc("record_income", { p_amount: toKobo(numericAmount), p_category: source, p_occurred_on: ledger?.today ?? "", p_note: note.trim(), p_idempotency_key: attemptKey.current });
+      : await supabase.rpc("record_income", { p_amount: toKobo(numericAmount), p_category: chosenSource, p_occurred_on: ledger?.today ?? "", p_note: note.trim(), p_idempotency_key: attemptKey.current });
     busy.current = false;
     setSubmitting(false);
     const result = data as RpcResult | null;
@@ -66,7 +74,8 @@ function AddFundsContent() {
     }
     attemptKey.current = "";
     await refetch();
-    setSource(fundSources[0] ?? "Other");
+    setSource(fundSources[0] ?? OTHER);
+    setSourceDetail("");
     setAmount("");
     setNote("");
     setError("");
@@ -132,6 +141,7 @@ function AddFundsContent() {
             <label htmlFor="fundSource">Where did the money come from?</label>
             <select id="fundSource" value={source} onChange={(event) => { setSource(event.target.value); setError(""); }}>{sources.map((item) => <option key={item}>{item}</option>)}</select>
           </div>
+          {source === OTHER && <OtherDetailField id="fundSourceDetail" label="Describe the source" placeholder="e.g. Sold old textbooks" value={sourceDetail} onChange={(value) => { setSourceDetail(value); setError(""); }} />}
           <div className={styles.transactionField}>
             <label htmlFor="fundNote">Note (optional)</label>
             <input id="fundNote" type="text" maxLength={120} placeholder="e.g. October allowance" value={note} onChange={(event) => setNote(event.target.value)} />

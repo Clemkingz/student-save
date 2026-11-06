@@ -18,6 +18,9 @@ export function ManualContribution({ goal, balance }: { goal: SavingsGoal; balan
   const [success, setSuccess] = useState<number | null>(null);
   const numeric = Number(amount);
   const valid = Number.isFinite(numeric) && Number.isSafeInteger(toKobo(numeric)) && numeric >= .01 && toKobo(numeric) <= toKobo(Math.min(balance, goal.targetAmount - goal.savedAmount));
+  if (goal.contributionMethod === "auto") {
+    return <p className={styles.goalError}>{goal.name} saves automatically. Switch it to manual in contribution settings to add funds yourself.</p>;
+  }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!valid || busy.current) return;
